@@ -5,20 +5,36 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-if (!process.env.STRIPE_SECRET_KEY) throw new Error("❌ STRIPE_SECRET_KEY manquante");
-if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("❌ STRIPE_WEBHOOK_SECRET manquante");
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// ✅ IMPORTANT: ne pas throw au top-level (sinon Vercel build casse)
+// ✅ IMPORTANT: ne pas instancier Stripe/Supabase au top-level si env manquantes
 
 export async function POST(req: Request) {
   console.log("🔔 Stripe webhook hit");
+
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!STRIPE_SECRET_KEY) {
+    console.error("❌ STRIPE_SECRET_KEY manquante");
+    return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
+  }
+  if (!STRIPE_WEBHOOK_SECRET) {
+    console.error("❌ STRIPE_WEBHOOK_SECRET manquante");
+    return NextResponse.json({ error: "Missing STRIPE_WEBHOOK_SECRET" }, { status: 500 });
+  }
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
+    return NextResponse.json({ error: "Missing SUPABASE_SERVICE_ROLE_KEY" }, { status: 500 });
+  }
+  if (!SUPABASE_URL) {
+    console.error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
+    return NextResponse.json({ error: "Missing NEXT_PUBLIC_SUPABASE_URL" }, { status: 500 });
+  }
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const sig = req.headers.get("stripe-signature");
   if (!sig) {
@@ -31,7 +47,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
     console.error("❌ Invalid signature:", err?.message || err);
     return NextResponse.json(
