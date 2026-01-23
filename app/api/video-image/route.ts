@@ -70,7 +70,8 @@ export async function POST(req: Request) {
       .jpeg({ quality: 92 })
       .toBuffer();
 
-    const normalizedImage = new File([normalizedBuffer], "input.jpg", {
+    // ✅ Fix TS/Vercel: Buffer -> Uint8Array pour être compatible BlobPart
+    const normalizedImage = new File([new Uint8Array(normalizedBuffer)], "input.jpg", {
       type: "image/jpeg",
     });
 
