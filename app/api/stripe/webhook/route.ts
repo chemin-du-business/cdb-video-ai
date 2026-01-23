@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 if (!process.env.STRIPE_SECRET_KEY) throw new Error("❌ STRIPE_SECRET_KEY manquante");
 if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("❌ STRIPE_WEBHOOK_SECRET manquante");
 if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
   let stripeChargeId: string | null = null;
   let receiptUrl: string | null = null;
 
-  // Montant / devise (Stripe Checkout renvoie souvent amount_total sur la session)
+  // Montant / devise
   const amountTotal = typeof session.amount_total === "number" ? session.amount_total : null;
   const currency = session.currency ?? null;
 
@@ -107,14 +108,13 @@ export async function POST(req: Request) {
         stripeChargeId = latestCharge.id ?? null;
         receiptUrl = latestCharge.receipt_url ?? null;
       } else if (typeof latestCharge === "string") {
-        // cas rare: si latest_charge est juste un id
         const ch = await stripe.charges.retrieve(latestCharge);
         stripeChargeId = ch.id ?? null;
         receiptUrl = ch.receipt_url ?? null;
       }
     } catch (e: any) {
       console.warn("⚠️ Unable to retrieve charge/receipt:", e?.message || e);
-      // pas bloquant: on crédite quand même
+      // pas bloquant
     }
   }
 
@@ -157,7 +157,6 @@ export async function POST(req: Request) {
     reason: `stripe_checkout_${session.metadata?.pack ?? "pack"}`,
     stripe_event_id: event.id,
 
-    // ✅ nouveaux champs
     stripe_session_id: stripeSessionId,
     stripe_payment_intent_id: paymentIntentId,
     stripe_charge_id: stripeChargeId,
@@ -168,7 +167,6 @@ export async function POST(req: Request) {
 
   if (ledErr) {
     console.error("❌ credit_ledger insert error:", ledErr);
-    // MVP: on ne rollback pas le crédit ici, l'unicité stripe_event_id protège du double.
     return NextResponse.json({ error: ledErr.message }, { status: 500 });
   }
 
