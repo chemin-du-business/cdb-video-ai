@@ -1,0 +1,177 @@
+import { NextResponse } from "next/server";
+import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
+
+if (!process.env.STRIPE_SECRET_KEY) throw new Error("❌ STRIPE_SECRET_KEY manquante");
+if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("❌ STRIPE_WEBHOOK_SECRET manquante");
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-06-20",
+});
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(req: Request) {
+  console.log("🔔 Stripe webhook hit");
+
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) {
+    console.error("❌ Missing stripe-signature header");
+    return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
+  }
+
+  // ✅ raw body sinon signature cassée
+  const rawBody = await req.text();
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+  } catch (err: any) {
+    console.error("❌ Invalid signature:", err?.message || err);
+    return NextResponse.json(
+      { error: `Invalid signature: ${err?.message || "unknown"}` },
+      { status: 400 }
+    );
+  }
+
+  console.log("✅ Event verified:", event.type, event.id);
+
+  // On ignore proprement les events qu'on ne traite pas
+  if (event.type !== "checkout.session.completed") {
+    return NextResponse.json({ received: true });
+  }
+
+  const session = event.data.object as Stripe.Checkout.Session;
+  console.log("🧾 checkout.session.completed payment_status:", session.payment_status);
+
+  // On crédite uniquement si payé
+  if (session.payment_status !== "paid") {
+    return NextResponse.json({ received: true, skipped: "not_paid" });
+  }
+
+  const userId = session.metadata?.user_id;
+  const creditsStr = session.metadata?.credits;
+
+  if (!userId || !creditsStr) {
+    console.error("❌ Missing metadata user_id/credits");
+    return NextResponse.json({ error: "Missing metadata user_id/credits" }, { status: 400 });
+  }
+
+  const credits = Number(creditsStr);
+  if (!Number.isFinite(credits) || credits <= 0) {
+    return NextResponse.json({ error: "Invalid credits in metadata" }, { status: 400 });
+  }
+
+  // ✅ idempotence (event déjà traité)
+  const { data: existing } = await supabase
+    .from("credit_ledger")
+    .select("id")
+    .eq("stripe_event_id", event.id)
+    .maybeSingle();
+
+  if (existing?.id) {
+    console.log("↩️ Event déjà traité, skip:", event.id);
+    return NextResponse.json({ received: true, skipped: "already_processed" });
+  }
+
+  /**
+   * =====================================================
+   * ✅ Récupérer receipt_url + montant + ids Stripe
+   * =====================================================
+   */
+  const stripeSessionId = session.id ?? null;
+  const paymentIntentId =
+    typeof session.payment_intent === "string" ? session.payment_intent : null;
+
+  let stripeChargeId: string | null = null;
+  let receiptUrl: string | null = null;
+
+  // Montant / devise (Stripe Checkout renvoie souvent amount_total sur la session)
+  const amountTotal = typeof session.amount_total === "number" ? session.amount_total : null;
+  const currency = session.currency ?? null;
+
+  if (paymentIntentId) {
+    try {
+      const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+        expand: ["latest_charge"],
+      });
+
+      const latestCharge = pi.latest_charge as Stripe.Charge | string | null;
+
+      if (latestCharge && typeof latestCharge !== "string") {
+        stripeChargeId = latestCharge.id ?? null;
+        receiptUrl = latestCharge.receipt_url ?? null;
+      } else if (typeof latestCharge === "string") {
+        // cas rare: si latest_charge est juste un id
+        const ch = await stripe.charges.retrieve(latestCharge);
+        stripeChargeId = ch.id ?? null;
+        receiptUrl = ch.receipt_url ?? null;
+      }
+    } catch (e: any) {
+      console.warn("⚠️ Unable to retrieve charge/receipt:", e?.message || e);
+      // pas bloquant: on crédite quand même
+    }
+  }
+
+  /**
+   * =====================================================
+   * ✅ Créditer l’utilisateur + écrire dans le ledger
+   * =====================================================
+   */
+
+  // 1) Lire credits actuels
+  const { data: profile, error: profErr } = await supabase
+    .from("profiles")
+    .select("credits")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profErr) {
+    console.error("❌ profiles select error:", profErr);
+    return NextResponse.json({ error: profErr.message }, { status: 500 });
+  }
+
+  const current = Number(profile?.credits ?? 0);
+  const next = current + credits;
+
+  // 2) Update profile
+  const { error: updErr } = await supabase
+    .from("profiles")
+    .update({ credits: next, plan: "credits" })
+    .eq("id", userId);
+
+  if (updErr) {
+    console.error("❌ profiles update error:", updErr);
+    return NextResponse.json({ error: updErr.message }, { status: 500 });
+  }
+
+  // 3) Ledger row (avec reçu + montant + ids)
+  const { error: ledErr } = await supabase.from("credit_ledger").insert({
+    user_id: userId,
+    delta: credits,
+    reason: `stripe_checkout_${session.metadata?.pack ?? "pack"}`,
+    stripe_event_id: event.id,
+
+    // ✅ nouveaux champs
+    stripe_session_id: stripeSessionId,
+    stripe_payment_intent_id: paymentIntentId,
+    stripe_charge_id: stripeChargeId,
+    amount_total: amountTotal,
+    currency: currency,
+    receipt_url: receiptUrl,
+  });
+
+  if (ledErr) {
+    console.error("❌ credit_ledger insert error:", ledErr);
+    // MVP: on ne rollback pas le crédit ici, l'unicité stripe_event_id protège du double.
+    return NextResponse.json({ error: ledErr.message }, { status: 500 });
+  }
+
+  console.log(`✅ Credits added: +${credits} (user: ${userId}) receipt:`, receiptUrl);
+  return NextResponse.json({ received: true, credited: credits, receipt_url: receiptUrl });
+}

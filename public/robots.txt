@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /check-email
+Disallow: /check-email-verified
+Disallow: /reset-password
+Disallow: /auth/callback
