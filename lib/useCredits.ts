@@ -10,6 +10,48 @@ export function useCredits() {
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
 
+  // ✅ Realtime channel (un seul à la fois)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const userIdRef = useRef<string | null>(null);
+
+  const unsubscribeRealtime = useCallback(() => {
+    channelRef.current?.unsubscribe();
+    channelRef.current = null;
+    userIdRef.current = null;
+  }, []);
+
+  const subscribeRealtime = useCallback(
+    (userId: string) => {
+      // évite de resubscribe si déjà sur le même user
+      if (userIdRef.current === userId && channelRef.current) return;
+
+      // reset ancien channel si user différent
+      unsubscribeRealtime();
+
+      userIdRef.current = userId;
+
+      channelRef.current = supabase
+        .channel(`realtime:profiles:${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${userId}`,
+          },
+          (payload) => {
+            const newCredits = (payload.new as any)?.credits;
+            if (typeof newCredits === "number") {
+              setCredits(newCredits); // ✅ update instant
+            }
+          }
+        )
+        .subscribe();
+    },
+    [unsubscribeRealtime]
+  );
+
   const load = useCallback(async () => {
     if (!mountedRef.current) return;
 
@@ -28,8 +70,12 @@ export function useCredits() {
           setCredits(null);
           setLoading(false);
         }
+        unsubscribeRealtime(); // ✅ stop realtime si logout
         return;
       }
+
+      // ✅ s'abonner en realtime dès qu'on a un user
+      subscribeRealtime(user.id);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -50,7 +96,7 @@ export function useCredits() {
     } finally {
       inFlightRef.current = false;
     }
-  }, []);
+  }, [subscribeRealtime, unsubscribeRealtime]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -66,10 +112,11 @@ export function useCredits() {
     return () => {
       mountedRef.current = false;
       sub.subscription.unsubscribe();
+      unsubscribeRealtime(); // ✅ cleanup
     };
-  }, [load]);
+  }, [load, unsubscribeRealtime]);
 
-  // ✅ refetch manuel (JobPoller va l’utiliser quand status = done)
+  // ✅ refetch manuel (JobPoller peut l’utiliser en backup)
   const refetch = useCallback(async () => {
     await load();
   }, [load]);
