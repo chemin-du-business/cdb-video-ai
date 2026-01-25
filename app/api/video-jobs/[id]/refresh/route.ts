@@ -25,10 +25,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const NO_STORE = { headers: { "Cache-Control": "no-store" } };
 
-export async function POST(
-  _req: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+function json(body: any, init?: Parameters<typeof NextResponse.json>[1]) {
+  return NextResponse.json(body, { ...(init ?? {}), ...NO_STORE });
+}
+
+export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
   const { id: jobId } = await context.params;
 
   console.log("🔁 REFRESH JOB", jobId);
@@ -43,33 +44,27 @@ export async function POST(
 
   if (error) {
     console.error("❌ DB error in refresh:", error);
-    return NextResponse.json({ error: error.message }, { status: 500, ...NO_STORE });
+    return json({ error: error.message }, { status: 500 });
   }
   if (!job) {
-    return NextResponse.json({ error: "Job not found" }, { status: 404, ...NO_STORE });
+    return json({ error: "Job not found" }, { status: 404 });
   }
 
   // ✅ Déjà terminé (done) + url dispo => on ne fait rien
   if ((job.status === "done" || job.status === "completed") && job.result_video_url) {
-    return NextResponse.json(
-      {
-        status: "done",
-        result_video_url: job.result_video_url,
-        progress: 100,
-      },
-      NO_STORE
-    );
+    return json({
+      status: "done",
+      result_video_url: job.result_video_url,
+      progress: 100,
+    });
   }
 
   // Pas encore lancé côté provider
   if (!job.provider_video_id) {
-    return NextResponse.json(
-      {
-        status: job.status ?? "queued",
-        progress: job.progress ?? 0,
-      },
-      NO_STORE
-    );
+    return json({
+      status: job.status ?? "queued",
+      progress: job.progress ?? 0,
+    });
   }
 
   // Statut OpenAI
@@ -97,13 +92,10 @@ export async function POST(
       })
       .eq("id", job.id);
 
-    return NextResponse.json(
-      {
-        status: "failed",
-        progress: oaProgress,
-      },
-      NO_STORE
-    );
+    return json({
+      status: "failed",
+      progress: oaProgress,
+    });
   }
 
   // ✅ Si terminé : télécharger MP4 + upload + set result_video_url + débiter 1 seule fois
@@ -122,17 +114,11 @@ export async function POST(
 
     if (!contentRes.ok) {
       const txt = await contentRes.text().catch(() => "");
-      const msg = `OpenAI /content download failed: ${contentRes.status} ${txt}`.slice(
-        0,
-        500
-      );
+      const msg = `OpenAI /content download failed: ${contentRes.status} ${txt}`.slice(0, 500);
 
-      await supabase
-        .from("video_jobs")
-        .update({ status: "failed", error_message: msg })
-        .eq("id", job.id);
+      await supabase.from("video_jobs").update({ status: "failed", error_message: msg }).eq("id", job.id);
 
-      return NextResponse.json({ error: msg }, { status: 500, ...NO_STORE });
+      return json({ error: msg }, { status: 500 });
     }
 
     const arrayBuffer = await contentRes.arrayBuffer();
@@ -150,15 +136,12 @@ export async function POST(
         .update({ status: "failed", error_message: upload.error.message })
         .eq("id", job.id);
 
-      return NextResponse.json(
-        { error: upload.error.message },
-        { status: 500, ...NO_STORE }
-      );
+      return json({ error: upload.error.message }, { status: 500 });
     }
 
     const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/generated-videos/${path}`;
 
-    // 1) On met à jour le job (done + url)
+    // 1) Update job done + url
     const updDone = await supabase
       .from("video_jobs")
       .update({
@@ -169,99 +152,20 @@ export async function POST(
       .eq("id", job.id);
 
     if (updDone.error) {
-      return NextResponse.json({ error: updDone.error.message }, { status: 500, ...NO_STORE });
+      return json({ error: updDone.error.message }, { status: 500 });
     }
 
     /**
      * =====================================================
-     * ✅ DÉBIT DU CRÉDIT (UNIQUEMENT SI DONE) + 1 SEULE FOIS
-     * Idempotence basée sur credit_ledger (job_id)
+     * ✅ DÉBIT SAFE (ANTI DOUBLE-DEBIT)
+     * On insère d'abord dans credit_ledger (idempotent via unique index),
+     * puis seulement si ça passe => on décrémente profiles.credits
      * =====================================================
      */
     const cost = Math.max(1, Number(job.cost_credits ?? 1));
-
-    // A) si déjà débité => on ne fait rien
-    const { data: existingDebit, error: debitCheckErr } = await supabase
-      .from("credit_ledger")
-      .select("id")
-      .eq("job_id", job.id)
-      .lt("delta", 0) // delta négatif = débit
-      .maybeSingle();
-
-    if (debitCheckErr) {
-      console.error("❌ debit check error:", debitCheckErr);
-      return NextResponse.json(
-        {
-          status: "done",
-          result_video_url: publicUrl,
-          progress: 100,
-          charged: false,
-          warning: debitCheckErr.message,
-        },
-        NO_STORE
-      );
-    }
-
-    if (existingDebit?.id) {
-      return NextResponse.json(
-        {
-          status: "done",
-          result_video_url: publicUrl,
-          progress: 100,
-          charged: true,
-          already_charged: true,
-        },
-        NO_STORE
-      );
-    }
-
-    // B) lire crédits actuels
-    const prof = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", job.user_id)
-      .maybeSingle();
-
-    if (prof.error) {
-      console.error("❌ profile read error:", prof.error);
-      return NextResponse.json(
-        {
-          status: "done",
-          result_video_url: publicUrl,
-          progress: 100,
-          charged: false,
-          warning: prof.error.message,
-        },
-        NO_STORE
-      );
-    }
-
-    const currentCredits = Number(prof.data?.credits ?? 0);
-    const nextCredits = Math.max(0, currentCredits - cost);
-
-    // C) update crédits
-    const dec = await supabase
-      .from("profiles")
-      .update({ credits: nextCredits })
-      .eq("id", job.user_id);
-
-    if (dec.error) {
-      console.error("❌ profile debit error:", dec.error);
-      return NextResponse.json(
-        {
-          status: "done",
-          result_video_url: publicUrl,
-          progress: 100,
-          charged: false,
-          warning: dec.error.message,
-        },
-        NO_STORE
-      );
-    }
-
-    // D) ledger (delta négatif)
     const reason = job.job_type === "remix" ? "video_remix_done" : "video_done";
 
+    // A) Tenter d'insérer le débit en premier (si duplicate => déjà débité)
     const led = await supabase.from("credit_ledger").insert({
       user_id: job.user_id,
       delta: -cost,
@@ -270,20 +174,77 @@ export async function POST(
     });
 
     if (led.error) {
+      const code = (led.error as any)?.code;
+
+      // duplicate key => déjà débité par un autre refresh (cron/poller)
+      if (code === "23505") {
+        return json({
+          status: "done",
+          result_video_url: publicUrl,
+          progress: 100,
+          charged: true,
+          already_charged: true,
+          cost_credits: cost,
+        });
+      }
+
       console.error("❌ ledger insert error:", led.error);
-      // MVP: on ne rollback pas
+      // Vidéo OK, débit KO => on renvoie warning (mais surtout on NE débite pas 2x)
+      return json({
+        status: "done",
+        result_video_url: publicUrl,
+        progress: 100,
+        charged: false,
+        warning: led.error.message,
+      });
     }
 
-    return NextResponse.json(
-      {
+    // B) décrémenter credits (après insert ledger OK)
+    const prof = await supabase
+      .from("profiles")
+      .select("credits")
+      .eq("id", job.user_id)
+      .maybeSingle();
+
+    if (prof.error) {
+      console.error("❌ profile read error:", prof.error);
+      return json({
         status: "done",
         result_video_url: publicUrl,
         progress: 100,
         charged: true,
         cost_credits: cost,
-      },
-      NO_STORE
-    );
+        warning: prof.error.message,
+      });
+    }
+
+    const currentCredits = Number(prof.data?.credits ?? 0);
+    const nextCredits = Math.max(0, currentCredits - cost);
+
+    const dec = await supabase
+      .from("profiles")
+      .update({ credits: nextCredits })
+      .eq("id", job.user_id);
+
+    if (dec.error) {
+      console.error("❌ profile debit error:", dec.error);
+      return json({
+        status: "done",
+        result_video_url: publicUrl,
+        progress: 100,
+        charged: true,
+        cost_credits: cost,
+        warning: dec.error.message,
+      });
+    }
+
+    return json({
+      status: "done",
+      result_video_url: publicUrl,
+      progress: 100,
+      charged: true,
+      cost_credits: cost,
+    });
   }
 
   // ✅ Toujours en cours : update DB
@@ -292,11 +253,8 @@ export async function POST(
     .update({ status: newStatus, progress: oaProgress })
     .eq("id", job.id);
 
-  return NextResponse.json(
-    {
-      status: newStatus,
-      progress: oaProgress,
-    },
-    NO_STORE
-  );
+  return json({
+    status: newStatus,
+    progress: oaProgress,
+  });
 }
