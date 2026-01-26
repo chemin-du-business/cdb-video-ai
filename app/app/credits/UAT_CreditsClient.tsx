@@ -20,7 +20,7 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
-type PackKey = "pack2" | "pack10" | "pack20" | "pack40";
+type PackKey = "unit" | "pack10" | "pack20" | "pack40";
 
 type ReceiptRow = {
   id: string;
@@ -60,8 +60,8 @@ function fmtDate(d: string) {
 function friendlyReason(reason: string) {
   const r = (reason || "").toLowerCase();
 
-  if (r.includes("stripe_checkout_pack2") || r.includes("checkout_pack2") || r.includes("pack2")) {
-    return "Pack 2 vidéos";
+  if (r.includes("stripe_checkout_unit") || r.includes("checkout_unit") || r === "unit") {
+    return "À l’unité (1 vidéo)";
   }
   if (r.includes("stripe_checkout_pack10") || r.includes("checkout_pack10") || r.includes("pack10")) {
     return "Pack 10 vidéos";
@@ -290,38 +290,10 @@ export default function CreditsClient() {
                 gap: 12,
               }}
             >
-              <PackCard
-                title="Pack 2"
-                price="20,90 € TTC"
-                sub="2 vidéos"
-                busy={loadingPack === "pack2"}
-                onClick={() => startCheckout("pack2")}
-              />
-
-              <PackCard
-                title="Pack 10"
-                price="89 € TTC"
-                sub="10 vidéos"
-                badge="🔥 Le plus populaire"
-                busy={loadingPack === "pack10"}
-                onClick={() => startCheckout("pack10")}
-              />
-
-              <PackCard
-                title="Pack 20"
-                price="169 € TTC"
-                sub="20 vidéos"
-                busy={loadingPack === "pack20"}
-                onClick={() => startCheckout("pack20")}
-              />
-
-              <PackCard
-                title="Pack 40"
-                price="309 € TTC"
-                sub="40 vidéos"
-                busy={loadingPack === "pack40"}
-                onClick={() => startCheckout("pack40")}
-              />
+              <PackCard title="À l’unité" price="10,90 € TTC" sub="1 vidéo" busy={loadingPack === "unit"} onClick={() => startCheckout("unit")} />
+              <PackCard title="Pack 10" price="89 € TTC" sub="10 vidéos" busy={loadingPack === "pack10"} onClick={() => startCheckout("pack10")} />
+              <PackCard title="Pack 20" price="169 € TTC" sub="20 vidéos" busy={loadingPack === "pack20"} onClick={() => startCheckout("pack20")} />
+              <PackCard title="Pack 40" price="309 € TTC" sub="40 vidéos" busy={loadingPack === "pack40"} onClick={() => startCheckout("pack40")} />
             </div>
           </div>
         </Card>
@@ -422,14 +394,12 @@ function PackCard({
   title,
   price,
   sub,
-  badge,
   busy,
   onClick,
 }: {
   title: string;
   price: string;
   sub: string;
-  badge?: string;
   busy: boolean;
   onClick: () => void;
 }) {
@@ -445,27 +415,8 @@ function PackCard({
         background: "rgba(255,255,255,0.95)",
         cursor: busy ? "not-allowed" : "pointer",
         opacity: busy ? 0.75 : 1,
-        position: "relative",
       }}
     >
-      {badge ? (
-        <div
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(0,0,0,0.10)",
-            background: "rgba(0,0,0,0.06)",
-            fontSize: 12,
-            fontWeight: 900,
-          }}
-        >
-          {badge}
-        </div>
-      ) : null}
-
       <div style={{ fontWeight: 900, fontSize: 14 }}>{title}</div>
       <div style={{ marginTop: 8, fontSize: 22, fontWeight: 900 }}>{price}</div>
       <div style={{ marginTop: 6, opacity: 0.75, fontSize: 13 }}>{sub}</div>
