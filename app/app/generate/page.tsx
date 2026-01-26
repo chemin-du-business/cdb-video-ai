@@ -3,7 +3,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { useCredits } from "@/lib/useCredits";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Tab = "text" | "remix" | "image";
 
@@ -72,6 +72,46 @@ function Pill({
   );
 }
 
+function NoCreditsBanner({ onBuy }: { onBuy: () => void }) {
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        padding: 12,
+        borderRadius: 14,
+        border: "1px solid rgba(245, 158, 11, 0.35)",
+        background: "rgba(245, 158, 11, 0.12)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ fontWeight: 900, fontSize: 13 }}>
+        ⚡ Pas de crédits — achète des crédits pour lancer la génération.
+      </div>
+
+      <button
+        onClick={onBuy}
+        style={{
+          padding: "10px 12px",
+          borderRadius: 999,
+          border: "1px solid rgba(0,0,0,0.14)",
+          background: "rgba(0,0,0,0.88)",
+          color: "#fff",
+          cursor: "pointer",
+          fontWeight: 900,
+          fontSize: 13,
+          whiteSpace: "nowrap",
+        }}
+      >
+        Acheter des crédits →
+      </button>
+    </div>
+  );
+}
+
 export default function CreatePage() {
   const router = useRouter();
   const { credits, loading: creditsLoading } = useCredits();
@@ -96,6 +136,7 @@ export default function CreatePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
+  const noCredits = !creditsLoading && (credits ?? 0) <= 0;
   const canGenerate = !creditsLoading && (credits ?? 0) > 0 && !submitting;
 
   useEffect(() => {
@@ -642,6 +683,11 @@ export default function CreatePage() {
                     : "Base: Image (input_reference)"}
                 </div>
               </div>
+
+              {/* ✅ BANNIÈRE SOUS LE BOUTON GÉNÉRER (si crédits = 0) */}
+              {noCredits && (
+                <NoCreditsBanner onBuy={() => router.push("/app/credits")} />
+              )}
 
               {tab === "remix" && !selectedTemplateId && (
                 <div
