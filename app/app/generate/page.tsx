@@ -416,7 +416,8 @@ export default function CreatePage() {
                         Template
                       </div>
                       <div style={{ opacity: 0.75, marginTop: 4 }}>
-                        Choisis un template, puis écris comment tu veux le transformer (texte, ton, offre, cible).
+                        Choisis un template, puis écris comment tu veux le
+                        transformer (texte, ton, offre, cible).
                       </div>
                     </div>
 
@@ -810,14 +811,7 @@ function TemplateCard({
             <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
           </div>
 
-          {t.description && (
-            <div
-              className="tplDesc"
-              style={{ marginTop: 6, opacity: 0.78, fontSize: 13 }}
-            >
-              {t.description}
-            </div>
-          )}
+          {/* ✅ description supprimée */}
         </div>
       </Card>
 
@@ -909,9 +903,6 @@ function TemplateCard({
           }
           .tplCard :global(.tplMeta) {
             font-size: 11px !important;
-          }
-          .tplCard :global(.tplDesc) {
-            font-size: 12px !important;
           }
 
           .tplCard :global(.soundHint),

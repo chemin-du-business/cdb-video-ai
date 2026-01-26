@@ -185,7 +185,11 @@ function EmotionsCarousel({
 
             {items[idx]?.src ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="absolute inset-0 h-full w-full object-cover" src={items[idx].src} alt={items[idx].alt ?? `Emotion ${idx + 1}`} />
+              <img
+                className="absolute inset-0 h-full w-full object-cover"
+                src={items[idx].src}
+                alt={items[idx].alt ?? `Emotion ${idx + 1}`}
+              />
             ) : (
               <div className="absolute inset-0 grid place-items-center">
                 <div className="text-xs font-medium text-black/55">Ajoute des images au carousel</div>
@@ -297,9 +301,20 @@ export default function Home() {
         }))
       : fallbackCards.map((c) => ({ ...c, format: "9:16", videoUrl: null as string | null }));
 
+  // ✅ CARROUSEL MIS À JOUR (3 IMAGES)
   const emotionsImages = [
-    { src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image1.png", alt: "Emotion 1" },
-    { src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image2.png", alt: "Emotion 2" },
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image4%20copie.png",
+      alt: "Emotion 1",
+    },
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image5%20copie.png",
+      alt: "Emotion 2",
+    },
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image7%20copie.png",
+      alt: "Emotion 3",
+    },
   ];
 
   const ctaImageUrl =
@@ -329,22 +344,12 @@ export default function Home() {
             <a className="hover:text-black" href="#usecases">
               Pour qui
             </a>
-            <a className="hover:text-black" href="#pricing">
-              Tarifs
-            </a>
             <a className="hover:text-black" href="#faq">
               FAQ
             </a>
           </div>
 
           <div className="flex items-center gap-3">
-            <a
-              className="hidden rounded-full border border-black/10 bg-black/[0.03] px-4 py-2 text-sm text-black/80 hover:bg-black/[0.05] md:inline-flex"
-              href="#pricing"
-            >
-              Voir les offres
-            </a>
-
             <button
               type="button"
               onClick={handleLoginClick}
@@ -378,8 +383,8 @@ export default function Home() {
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-7 text-black/65 md:text-lg">
-                Tu choisis un mode (script, image ou template), tu ajustes l’angle, puis tu lances.
-                En quelques minutes, tu récupères une vidéo verticale 9:16 exploitable pour tes pubs et ton contenu.
+                Tu choisis un mode (script, image ou template), tu ajustes l’angle, puis tu lances. En quelques minutes,
+                tu récupères une vidéo verticale 9:16 exploitable pour tes pubs et ton contenu.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -641,39 +646,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* PRICING */}
-        <section id="pricing" className="mx-auto w-full max-w-6xl px-6 py-16">
-          <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">Tarifs</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-            Choisis un pack. Tu consommes des crédits à la génération.
-          </p>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-4">
-            {[
-              { name: "À l’unité", price: "10,90 € TTC", desc: "1 vidéo" },
-              { name: "Pack 10", price: "89 € TTC", desc: "10 vidéos" },
-              { name: "Pack 20", price: "169 € TTC", desc: "20 vidéos" },
-              { name: "Pack 40", price: "309 € TTC", desc: "40 vidéos" },
-            ].map((p) => (
-              <div
-                key={p.name}
-                className="rounded-3xl border border-black/10 bg-white/80 p-6 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.25)] backdrop-blur"
-              >
-                <div className="text-sm font-semibold text-black">{p.name}</div>
-                <div className="mt-4 text-3xl font-semibold tracking-tight text-black">{p.price}</div>
-                <div className="mt-1 text-sm text-black/55">{p.desc}</div>
-
-                <Link
-                  href="/login?next=/app/credits"
-                  className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-black text-sm font-semibold text-white hover:bg-black/90"
-                >
-                  Choisir
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* FAQ */}
         <section id="faq" className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-10">
@@ -733,13 +705,6 @@ export default function Home() {
                     Créer ma première vidéo
                     <span className="ml-2">→</span>
                   </Link>
-
-                  <a
-                    className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white/70 px-6 text-sm font-semibold text-black/80 hover:bg-black/[0.05]"
-                    href="#pricing"
-                  >
-                    Voir les tarifs
-                  </a>
                 </div>
               </div>
 
