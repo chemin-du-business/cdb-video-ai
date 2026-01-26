@@ -23,6 +23,32 @@ function fmtDate(d: string) {
   }
 }
 
+/**
+ * ✅ Téléchargement "direct" (sans ouvrir un nouvel onglet)
+ * - Fetch en blob + lien temporaire + click programmatique
+ * - Fallback: ouvre l'URL si le fetch est bloqué (CORS / Safari)
+ */
+async function downloadDirect(url: string, filename = "video.mp4") {
+  try {
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error("fetch failed");
+    const blob = await res.blob();
+
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+  } catch {
+    // fallback (au cas où le storage ne permet pas le fetch cross-origin)
+    window.open(url, "_blank", "noreferrer");
+  }
+}
+
 export default function LibraryPage() {
   const router = useRouter();
 
@@ -37,14 +63,17 @@ export default function LibraryPage() {
 
   const jobsSorted = useMemo(() => {
     return [...jobs].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [jobs]);
 
   const loadJobsSilent = async () => {
     const { data, error } = await supabase
       .from("video_jobs")
-      .select("id,status,progress,user_prompt,prompt_final,created_at,result_video_url,error_message")
+      .select(
+        "id,status,progress,user_prompt,prompt_final,created_at,result_video_url,error_message"
+      )
       .order("created_at", { ascending: false })
       .limit(60);
 
@@ -61,7 +90,9 @@ export default function LibraryPage() {
     const force = Boolean(opts?.force);
 
     const pendingLocal = jobsRef.current.some(
-      (j) => (j.status === "queued" || j.status === "processing") && !j.result_video_url
+      (j) =>
+        (j.status === "queued" || j.status === "processing") &&
+        !j.result_video_url
     );
 
     if (!force && !pendingLocal) {
@@ -81,7 +112,11 @@ export default function LibraryPage() {
       }
 
       const idsToRefresh = jobsRef.current
-        .filter((j) => (j.status === "queued" || j.status === "processing") && !j.result_video_url)
+        .filter(
+          (j) =>
+            (j.status === "queued" || j.status === "processing") &&
+            !j.result_video_url
+        )
         .map((j) => j.id);
 
       if (idsToRefresh.length > 0) {
@@ -122,7 +157,9 @@ export default function LibraryPage() {
 
     const t = setInterval(() => {
       const pending = jobsRef.current.some(
-        (j) => (j.status === "queued" || j.status === "processing") && !j.result_video_url
+        (j) =>
+          (j.status === "queued" || j.status === "processing") &&
+          !j.result_video_url
       );
       if (pending) refreshAll();
     }, 6000);
@@ -145,9 +182,9 @@ export default function LibraryPage() {
         }}
       >
         <div>
-            <h1 style={{ fontSize: 28, margin: 0, letterSpacing: -0.6 }}>
-              Bibliothèque
-            </h1>
+          <h1 style={{ fontSize: 28, margin: 0, letterSpacing: -0.6 }}>
+            Bibliothèque
+          </h1>
           <div style={{ opacity: 0.7, marginTop: 6 }}>
             Toutes tes vidéos (terminées + en cours).
           </div>
@@ -256,7 +293,6 @@ function JobCard({
         return;
       }
 
-      // ✅ afficher le job remix tout de suite + scroll top + refresh immédiat
       await onJobCreated();
 
       setRemixPrompt("");
@@ -347,7 +383,14 @@ function JobCard({
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginTop: 12,
+            flexWrap: "wrap",
+          }}
+        >
           {canShowVideo ? (
             <>
               <a
@@ -367,21 +410,27 @@ function JobCard({
                 Ouvrir
               </a>
 
-              <a
-                href={job.result_video_url!}
-                download
+              {/* ✅ Télécharger direct */}
+              <button
+                onClick={() =>
+                  downloadDirect(
+                    job.result_video_url!,
+                    `video-${job.id}.mp4`
+                  )
+                }
                 style={{
                   padding: "8px 10px",
                   borderRadius: 12,
                   border: "1px solid rgba(0,0,0,0.12)",
-                  textDecoration: "none",
+                  background: "rgba(255,255,255,0.95)",
                   color: "#111",
                   fontWeight: 700,
                   fontSize: 13,
+                  cursor: "pointer",
                 }}
               >
                 Télécharger
-              </a>
+              </button>
 
               <button
                 onClick={() => setShowRemix((v) => !v)}
@@ -390,7 +439,9 @@ function JobCard({
                   padding: "8px 10px",
                   borderRadius: 12,
                   border: "1px solid rgba(0,0,0,0.12)",
-                  background: canRemix ? "rgba(0,0,0,0.88)" : "rgba(0,0,0,0.18)",
+                  background: canRemix
+                    ? "rgba(0,0,0,0.88)"
+                    : "rgba(0,0,0,0.18)",
                   color: "#fff",
                   cursor: canRemix ? "pointer" : "not-allowed",
                   fontWeight: 800,
@@ -403,7 +454,9 @@ function JobCard({
             </>
           ) : (
             <div style={{ fontSize: 12, opacity: 0.7 }}>
-              {isDone ? "Terminé, mais aucun lien vidéo n’a été enregistré." : "Génération en cours…"}
+              {isDone
+                ? "Terminé, mais aucun lien vidéo n’a été enregistré."
+                : "Génération en cours…"}
             </div>
           )}
         </div>
@@ -419,7 +472,7 @@ function JobCard({
             }}
           >
             <div style={{ fontWeight: 900, fontSize: 13 }}>
-              Remix (1 crédit, débité à la réussite)
+              Remix
             </div>
             <div style={{ opacity: 0.75, marginTop: 6, fontSize: 12 }}>
               Ajoute des consignes pour transformer cette vidéo.
@@ -443,7 +496,14 @@ function JobCard({
               }}
             />
 
-            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <button
                 onClick={submitRemix}
                 disabled={remixSubmitting}
@@ -485,8 +545,8 @@ function JobCard({
 }
 
 /**
- * ✅ Fix “bloc gris” : on force le navigateur à charger et afficher une frame,
- * tout en gardant un overlay play.
+ * ✅ Play button "vrai" (SVG) -> pas d’emoji sur iOS
+ * + garde l’overlay comme sur desktop
  */
 function VideoPreview({ url }: { url: string }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -500,7 +560,8 @@ function VideoPreview({ url }: { url: string }) {
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(135deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12))",
+            background:
+              "linear-gradient(135deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12))",
           }}
         />
       )}
@@ -510,7 +571,6 @@ function VideoPreview({ url }: { url: string }) {
         src={url}
         preload="auto"
         playsInline
-        // ✅ tant qu’on ne lit pas, on évite les controls (ça fait “thumbnail”)
         controls={playing}
         style={{
           width: "100%",
@@ -537,7 +597,8 @@ function VideoPreview({ url }: { url: string }) {
             inset: 0,
             display: "grid",
             placeItems: "center",
-            background: "linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.25))",
+            background:
+              "linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.25))",
             border: "none",
             cursor: "pointer",
           }}
@@ -549,14 +610,20 @@ function VideoPreview({ url }: { url: string }) {
               height: 56,
               borderRadius: 999,
               background: "rgba(0,0,0,0.65)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              fontSize: 20,
+              display: "grid",
+              placeItems: "center",
             }}
           >
-            ▶
+            {/* ✅ SVG (pas d'emoji) */}
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M8 5v14l11-7z" fill="#fff" />
+            </svg>
           </div>
         </button>
       )}

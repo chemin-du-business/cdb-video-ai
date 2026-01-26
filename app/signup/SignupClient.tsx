@@ -127,10 +127,10 @@ export default function SignupClient() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-lg font-semibold">Inscription</h1>
-                <p className="mt-1 text-sm text-black/55">Le plus simple : Google.</p>
+                <p className="mt-1 text-sm text-black/55">Inscris-toi pour créer ta vidéo en quelques minutes</p>
               </div>
               <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs text-black/60">
-                Secure
+                Securisé
               </span>
             </div>
 

@@ -122,7 +122,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-extrabold tracking-tight">CDB Video IA</div>
-              <div className="truncate text-[11px] font-medium text-black/50">Arcade-like · Sora</div>
+              <div className="truncate text-[11px] font-medium text-black/50">Transforme une idée en vidéo</div>
             </div>
           </Link>
 

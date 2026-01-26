@@ -172,10 +172,10 @@ export default function LoginClient() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-lg font-semibold">Connexion</h1>
-                <p className="mt-1 text-sm text-black/55">Le plus simple : Google.</p>
+                <p className="mt-1 text-sm text-black/55">Connecte-toi pour créer ta vidéo en quelques minutes</p>
               </div>
               <span className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-xs text-black/60">
-                Secure
+                Securisé
               </span>
             </div>
 
@@ -276,10 +276,6 @@ export default function LoginClient() {
                     >
                       Annuler
                     </button>
-                  </div>
-
-                  <div className="mt-2 text-[11px] text-black/50">
-                    Astuce : le lien peut être ouvert sur un autre navigateur (Safari/Chrome) ✅
                   </div>
                 </div>
               )}

@@ -103,7 +103,9 @@ export default function CreatePage() {
       setTemplatesLoading(true);
       const { data, error } = await supabase
         .from("templates")
-        .select("id, name, description, category, preview_video_url, template_video_id")
+        .select(
+          "id, name, description, category, preview_video_url, template_video_id"
+        )
         .eq("is_active", true)
         .order("position", { ascending: true });
 
@@ -143,7 +145,9 @@ export default function CreatePage() {
     if (selectedCategory === "uncategorized") {
       return templates.filter((t) => !(t.category ?? "").trim());
     }
-    return templates.filter((t) => (t.category ?? "").trim() === selectedCategory);
+    return templates.filter(
+      (t) => (t.category ?? "").trim() === selectedCategory
+    );
   }, [templates, selectedCategory]);
 
   // ✅ si on change de catégorie et que le template sélectionné n'est plus visible -> on désélectionne
@@ -151,7 +155,9 @@ export default function CreatePage() {
     if (tab !== "remix") return;
     if (!selectedTemplateId) return;
 
-    const stillVisible = templatesFiltered.some((t) => t.id === selectedTemplateId);
+    const stillVisible = templatesFiltered.some(
+      (t) => t.id === selectedTemplateId
+    );
     if (!stillVisible) setSelectedTemplateId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, templatesFiltered.length, tab]);
@@ -239,7 +245,8 @@ export default function CreatePage() {
     setSubmitting(false);
 
     if (res.status === 402) return handleNoCredits(data.error);
-    if (!res.ok) return alert(data.error || "Erreur lors de la création du remix");
+    if (!res.ok)
+      return alert(data.error || "Erreur lors de la création du remix");
 
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
@@ -273,7 +280,8 @@ export default function CreatePage() {
     setSubmitting(false);
 
     if (res.status === 402) return handleNoCredits(data.error);
-    if (!res.ok) return alert(data.error || "Erreur lors de la création (image → vidéo)");
+    if (!res.ok)
+      return alert(data.error || "Erreur lors de la création (image → vidéo)");
 
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
@@ -405,11 +413,10 @@ export default function CreatePage() {
                   >
                     <div>
                       <div style={{ fontWeight: 900, fontSize: 16 }}>
-                        Choisir un template
+                        Template
                       </div>
                       <div style={{ opacity: 0.75, marginTop: 4 }}>
-                        Desktop : passe la souris pour le son. Mobile : tape sur
-                        la vidéo pour activer/couper le son.
+                        Choisis un template, puis écris comment tu veux le transformer (texte, ton, offre, cible).
                       </div>
                     </div>
 
@@ -435,20 +442,16 @@ export default function CreatePage() {
                         active={selectedCategory === c}
                         onClick={() => setSelectedCategory(c)}
                       >
-                        {c === "all" ? "Tous" : c === "uncategorized" ? "Autres" : c}
+                        {c === "all"
+                          ? "Tous"
+                          : c === "uncategorized"
+                          ? "Autres"
+                          : c}
                       </Pill>
                     ))}
                   </div>
 
-                  {/* ✅ AUTO-FIT responsive */}
-                  <div
-                    style={{
-                      marginTop: 14,
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                      gap: 12,
-                    }}
-                  >
+                  <div className="templatesGrid">
                     {templatesLoading ? (
                       <div style={{ opacity: 0.8 }}>
                         Chargement des templates…
@@ -475,7 +478,6 @@ export default function CreatePage() {
                 </>
               )}
 
-              {/* Image tab */}
               {tab === "image" && (
                 <>
                   <div style={{ fontWeight: 900, fontSize: 16 }}>
@@ -555,7 +557,6 @@ export default function CreatePage() {
                 </>
               )}
 
-              {/* Prompt (all tabs) */}
               <div style={{ fontWeight: 900, fontSize: 16 }}>
                 Prompt{" "}
                 {tab === "remix" && selectedTemplateId && (
@@ -641,7 +642,6 @@ export default function CreatePage() {
                 </div>
               </div>
 
-              {/* Petit rappel si tab remix et pas de sélection */}
               {tab === "remix" && !selectedTemplateId && (
                 <div
                   style={{
@@ -661,6 +661,31 @@ export default function CreatePage() {
           </Card>
         </div>
       </div>
+
+      <style jsx>{`
+        .templatesGrid {
+          margin-top: 14px;
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        @media (max-width: 980px) {
+          .templatesGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 640px) {
+          .templatesGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+        }
+        @media (max-width: 360px) {
+          .templatesGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </main>
   );
 }
@@ -702,113 +727,200 @@ function TemplateCard({
   };
 
   return (
-    <Card selected={selected}>
-      {t.preview_video_url ? (
-        <div style={{ position: "relative" }}>
-          <video
-            ref={videoRef}
-            src={t.preview_video_url}
-            autoPlay
-            loop
-            muted={!soundOn}
-            playsInline
-            preload="metadata"
-            style={{ width: "100%", display: "block" }}
-            onMouseEnter={() => {
-              setSoundOn(true);
-              setMuted(false);
-            }}
-            onMouseLeave={() => {
-              setSoundOn(false);
-              setMuted(true);
-            }}
-            onClick={() => {
-              // mobile tap: toggle son
-              toggleSoundMobile();
-            }}
-          />
+    <div className="tplCard">
+      <Card selected={selected}>
+        {t.preview_video_url ? (
+          <div style={{ position: "relative" }}>
+            <video
+              ref={videoRef}
+              src={t.preview_video_url}
+              autoPlay
+              loop
+              muted={!soundOn}
+              playsInline
+              preload="metadata"
+              style={{ width: "100%", display: "block" }}
+              onMouseEnter={() => {
+                setSoundOn(true);
+                setMuted(false);
+              }}
+              onMouseLeave={() => {
+                setSoundOn(false);
+                setMuted(true);
+              }}
+              onClick={() => {
+                toggleSoundMobile();
+              }}
+            />
 
-          {/* ✅ Selected badge simple */}
-          {selected && (
-            <div
+            {/* ✅ TOP PILLS (gap garanti, ne se touchent plus) */}
+            <div className="topPills" aria-hidden="true">
+              {selected ? (
+                <div className="selectedBadge" title="Template sélectionné">
+                  ✅ Sélectionné
+                </div>
+              ) : (
+                <span />
+              )}
+
+              <div className="soundHint">🔊 {soundOn ? "Son ON" : "Son OFF"}</div>
+            </div>
+
+            <button
+              className="selectBtn"
+              onClick={onSelect}
               style={{
                 position: "absolute",
-                top: 10,
                 left: 10,
-                background: "rgba(16, 185, 129, 0.92)",
+                right: 10,
+                bottom: 10,
+                margin: "0 auto",
+                padding: "10px 12px",
+                borderRadius: 14,
+                border: "1px solid rgba(0,0,0,0.12)",
+                background: selected
+                  ? "rgba(16, 185, 129, 0.95)"
+                  : "rgba(0,0,0,0.88)",
                 color: "#fff",
-                padding: "6px 10px",
-                borderRadius: 999,
-                fontSize: 12,
                 fontWeight: 900,
+                cursor: "pointer",
+                boxShadow: "0 10px 24px rgba(0,0,0,0.16)",
               }}
-              title="Template sélectionné"
+              title="Sélectionner ce template"
             >
-              ✅ Sélectionné
-            </div>
-          )}
-
-          {/* Hint son */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 58,
-              right: 10,
-              background: "rgba(0,0,0,0.6)",
-              color: "#fff",
-              padding: "6px 10px",
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 800,
-              pointerEvents: "none",
-            }}
-          >
-            🔊 {soundOn ? "Son ON" : "Son OFF"}
+              {selected ? "Template sélectionné ✓" : "Sélectionner ce template"}
+            </button>
           </div>
-
-          {/* ✅ Bouton sélectionner en bas de la vidéo */}
-          <button
-            onClick={onSelect}
-            style={{
-              position: "absolute",
-              left: 10,
-              right: 10,
-              bottom: 10,
-              margin: "0 auto",
-              padding: "10px 12px",
-              borderRadius: 14,
-              border: "1px solid rgba(0,0,0,0.12)",
-              background: selected
-                ? "rgba(16, 185, 129, 0.95)"
-                : "rgba(0,0,0,0.88)",
-              color: "#fff",
-              fontWeight: 900,
-              cursor: "pointer",
-              boxShadow: "0 10px 24px rgba(0,0,0,0.16)",
-            }}
-            title="Sélectionner ce template"
-          >
-            {selected ? "Template sélectionné ✓" : "Sélectionner ce template"}
-          </button>
-        </div>
-      ) : (
-        <div style={{ padding: 18, opacity: 0.75 }}>Aucun preview_video_url</div>
-      )}
-
-      <div style={{ padding: 14 }}>
-        <div style={{ fontWeight: 900 }}>{t.name}</div>
-
-        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
-          Catégorie :{" "}
-          <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
-        </div>
-
-        {t.description && (
-          <div style={{ marginTop: 6, opacity: 0.78, fontSize: 13 }}>
-            {t.description}
+        ) : (
+          <div style={{ padding: 18, opacity: 0.75 }}>
+            Aucun preview_video_url
           </div>
         )}
-      </div>
-    </Card>
+
+        <div className="tplBody" style={{ padding: 14 }}>
+          <div className="tplTitle" style={{ fontWeight: 900 }}>
+            {t.name}
+          </div>
+
+          <div
+            className="tplMeta"
+            style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}
+          >
+            Catégorie :{" "}
+            <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
+          </div>
+
+          {t.description && (
+            <div
+              className="tplDesc"
+              style={{ marginTop: 6, opacity: 0.78, fontSize: 13 }}
+            >
+              {t.description}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <style jsx>{`
+        .tplCard :global(video) {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        /* top pills layout */
+        .tplCard :global(.topPills) {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          right: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px; /* 👈 espace entre les 2 pills */
+          z-index: 6;
+          pointer-events: none; /* ne gêne pas hover/click vidéo */
+        }
+
+        .tplCard :global(.selectedBadge) {
+          background: rgba(16, 185, 129, 0.92);
+          color: #fff;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .tplCard :global(.soundHint) {
+          background: rgba(0, 0, 0, 0.55);
+          color: #fff;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        /* bouton select */
+        .tplCard :global(.selectBtn) {
+          z-index: 4;
+          word-break: keep-all;
+        }
+
+        @media (min-width: 641px) {
+          .tplCard :global(.selectBtn) {
+            left: 50% !important;
+            right: auto !important;
+            transform: translateX(-50%) !important;
+
+            width: auto !important;
+            max-width: calc(100% - 24px) !important;
+
+            padding: 9px 14px !important;
+            border-radius: 999px !important;
+
+            font-size: 12px !important;
+            letter-spacing: 0.15px !important;
+            line-height: 1 !important;
+
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .tplCard :global(.selectBtn) {
+            padding: 8px 10px !important;
+            border-radius: 12px !important;
+            font-size: 12px !important;
+
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+
+          .tplCard :global(.tplBody) {
+            padding: 10px !important;
+          }
+          .tplCard :global(.tplTitle) {
+            font-size: 13px !important;
+          }
+          .tplCard :global(.tplMeta) {
+            font-size: 11px !important;
+          }
+          .tplCard :global(.tplDesc) {
+            font-size: 12px !important;
+          }
+
+          .tplCard :global(.soundHint),
+          .tplCard :global(.selectedBadge) {
+            padding: 5px 8px !important;
+            font-size: 11px !important;
+          }
+        }
+      `}</style>
+    </div>
   );
 }

@@ -187,7 +187,7 @@ export default function CreditsClient() {
         </div>
 
         <button
-          onClick={() => router.push("/app/library")}
+          onClick={() => router.push("/app/generate")}
           style={{
             padding: "10px 14px",
             borderRadius: 14,
@@ -198,7 +198,7 @@ export default function CreditsClient() {
             fontWeight: 900,
           }}
         >
-          Aller à la bibliothèque
+          Aller à la génération
         </button>
       </div>
 
@@ -228,7 +228,7 @@ export default function CreditsClient() {
             {state === "success" ? (
               <>
                 <button
-                  onClick={() => router.push("/app/library")}
+                  onClick={() => router.push("/app/generate")}
                   style={{
                     padding: "10px 14px",
                     borderRadius: 14,
@@ -239,7 +239,7 @@ export default function CreditsClient() {
                     fontWeight: 900,
                   }}
                 >
-                  Voir la bibliothèque
+                  Aller à la génération
                 </button>
                 <button
                   onClick={() => router.replace("/app/credits")}

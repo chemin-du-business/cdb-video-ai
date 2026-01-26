@@ -74,7 +74,7 @@ function PreviewCard({
 
           <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
             <div className="rounded-full border border-black/10 bg-white/70 px-2 py-1 text-[10px] text-black/70 backdrop-blur">
-              UGC Ad
+              UGC / Ads
             </div>
           </div>
 
@@ -123,10 +123,10 @@ function PreviewCard({
 }
 
 function EmotionsCarousel({
-  title = "Contrôle des émotions",
-  badge = "Feature",
-  subtitle = "Montre des expressions différentes, cohérentes et naturelles.",
-  bullets = ["Expressions crédibles", "Ton cohérent avec le script", "Idéal UGC (vertical 9:16)"],
+  title = "Expressions & ton naturels",
+  badge = "Nouveau",
+  subtitle = "Tu peux varier l’intention, l’énergie et l’expression pour coller à ton script.",
+  bullets = ["Expressions crédibles", "Ton cohérent avec le script", "Idéal Ads & UGC (vertical 9:16)"],
   images,
   autoplayMs = 2600,
 }: {
@@ -142,11 +142,7 @@ function EmotionsCarousel({
 
   useEffect(() => {
     if (items.length <= 1) return;
-
-    const t = window.setInterval(() => {
-      setIdx((v) => (v + 1) % items.length);
-    }, autoplayMs);
-
+    const t = window.setInterval(() => setIdx((v) => (v + 1) % items.length), autoplayMs);
     return () => window.clearInterval(t);
   }, [items.length, autoplayMs]);
 
@@ -182,21 +178,14 @@ function EmotionsCarousel({
             {items.length > 1 ? (
               <div className="absolute left-3 right-3 top-3 z-10">
                 <div className="h-1 w-full overflow-hidden rounded-full bg-white/70 backdrop-blur">
-                  <div
-                    className="h-full bg-black/60 transition-[width] duration-500"
-                    style={{ width: `${progressPct}%` }}
-                  />
+                  <div className="h-full bg-black/60 transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
                 </div>
               </div>
             ) : null}
 
             {items[idx]?.src ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="absolute inset-0 h-full w-full object-cover"
-                src={items[idx].src}
-                alt={items[idx].alt ?? `Emotion ${idx + 1}`}
-              />
+              <img className="absolute inset-0 h-full w-full object-cover" src={items[idx].src} alt={items[idx].alt ?? `Emotion ${idx + 1}`} />
             ) : (
               <div className="absolute inset-0 grid place-items-center">
                 <div className="text-xs font-medium text-black/55">Ajoute des images au carousel</div>
@@ -229,10 +218,7 @@ function EmotionsCarousel({
                     key={i}
                     type="button"
                     onClick={() => setIdx(i)}
-                    className={[
-                      "h-2 w-2 rounded-full border border-black/15",
-                      i === idx ? "bg-black/65" : "bg-white/70",
-                    ].join(" ")}
+                    className={["h-2 w-2 rounded-full border border-black/15", i === idx ? "bg-black/65" : "bg-white/70"].join(" ")}
                     aria-label={`Aller à l’image ${i + 1}`}
                     title={`Aller à l’image ${i + 1}`}
                   />
@@ -257,18 +243,14 @@ export default function Home() {
     setCheckingLogin(true);
     try {
       const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        router.push("/app");
-      } else {
-        router.push("/login?next=%2Fapp");
-      }
+      if (data.session) router.push("/app");
+      else router.push("/login?next=%2Fapp");
     } finally {
       setCheckingLogin(false);
     }
   };
 
   const [previews, setPreviews] = useState<TemplatePreview[]>([]);
-
   useEffect(() => {
     let mounted = true;
 
@@ -299,10 +281,10 @@ export default function Home() {
   }, []);
 
   const fallbackCards = [
-    { title: "Style Lifestyle", subtitle: "Hook : bénéfice produit" },
-    { title: "Style Business", subtitle: "Angle : bénéfice direct" },
-    { title: "Style Premium", subtitle: "Démo + preuve" },
-    { title: "Style Énergique", subtitle: "UGC talk-to-camera" },
+    { title: "Script → Vidéo", subtitle: "Tu écris, l’IA joue." },
+    { title: "Image → Vidéo", subtitle: "Tu fournis une image, l’IA anime." },
+    { title: "Template → Remix", subtitle: "Tu pars d’un style, tu variantes." },
+    { title: "Variantes A/B", subtitle: "Hooks, CTA, ton, rythme." },
   ];
 
   const cardsToShow =
@@ -316,14 +298,8 @@ export default function Home() {
       : fallbackCards.map((c) => ({ ...c, format: "9:16", videoUrl: null as string | null }));
 
   const emotionsImages = [
-    {
-      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image1.png",
-      alt: "Emotion 1",
-    },
-    {
-      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image2.png",
-      alt: "Emotion 2",
-    },
+    { src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image1.png", alt: "Emotion 1" },
+    { src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image2.png", alt: "Emotion 2" },
   ];
 
   const ctaImageUrl =
@@ -344,8 +320,11 @@ export default function Home() {
           </a>
 
           <div className="hidden items-center gap-6 text-sm text-black/60 md:flex">
+            <a className="hover:text-black" href="#how">
+              Comment ça marche
+            </a>
             <a className="hover:text-black" href="#features">
-              Features
+              Ce que tu peux faire
             </a>
             <a className="hover:text-black" href="#usecases">
               Pour qui
@@ -372,7 +351,7 @@ export default function Home() {
               disabled={checkingLogin}
               className="inline-flex items-center justify-center rounded-full bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-black/90 disabled:opacity-60"
             >
-              {checkingLogin ? "Redirection…" : "Se connecter"}
+              {checkingLogin ? "Redirection…" : "Accéder à l’app"}
               <span className="ml-2">→</span>
             </button>
           </div>
@@ -385,22 +364,22 @@ export default function Home() {
           <div className="grid items-center gap-10 md:grid-cols-[1.1fr_0.9fr]">
             <div>
               <div className="mb-5 flex flex-wrap gap-2">
-                <Pill>🎬 UGC Ads & e-commerce</Pill>
-                <Pill>🤖 Propulsé par Sora 2 Pro</Pill>
+                <Pill>⚡ Script, Image ou Template</Pill>
+                <Pill>📱 Reels · Shorts · TikTok</Pill>
+                <Pill>🎯 Variantes A/B</Pill>
               </div>
 
               <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-black md:text-6xl">
-                Crée des{" "}
+                Génère des{" "}
                 <span className="bg-gradient-to-r from-indigo-700 via-violet-700 to-fuchsia-700 bg-clip-text text-transparent">
-                  vidéos UGC
+                  vidéos courtes
                 </span>{" "}
-                qui convertissent, sans tournage.
+                prêtes à publier, sans tournage.
               </h1>
 
               <p className="mt-5 max-w-xl text-base leading-7 text-black/65 md:text-lg">
-                CDB Video IA génère des vidéos publicitaires verticales (format TikTok) à partir de templates,
-                de scripts et de profils variés. Propulsé par{" "}
-                <span className="text-black/80">Sora 2 Pro</span>.
+                Tu choisis un mode (script, image ou template), tu ajustes l’angle, puis tu lances.
+                En quelques minutes, tu récupères une vidéo verticale 9:16 exploitable pour tes pubs et ton contenu.
               </p>
 
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -411,6 +390,25 @@ export default function Home() {
                   Créer ma première vidéo
                   <span className="ml-2">→</span>
                 </Link>
+
+                <a
+                  href="#how"
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white/70 px-6 text-sm font-semibold text-black/80 hover:bg-black/[0.05]"
+                >
+                  Voir comment ça marche
+                </a>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-black/55">
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600/70" /> Export 9:16
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600/70" /> Téléchargement instant
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600/70" /> Variantes (A/B)
+                </span>
               </div>
             </div>
 
@@ -419,32 +417,32 @@ export default function Home() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="translate-y-6">
                   <PreviewCard
-                    title={cardsToShow[0]?.title ?? "Style Lifestyle"}
-                    subtitle={cardsToShow[0]?.subtitle ?? "Hook : bénéfice produit"}
+                    title={cardsToShow[0]?.title ?? "Script → Vidéo"}
+                    subtitle={cardsToShow[0]?.subtitle ?? "Tu écris, l’IA joue."}
                     format={cardsToShow[0]?.format ?? "9:16"}
                     videoUrl={cardsToShow[0]?.videoUrl}
                   />
                 </div>
                 <div className="-translate-y-2">
                   <PreviewCard
-                    title={cardsToShow[1]?.title ?? "Style Business"}
-                    subtitle={cardsToShow[1]?.subtitle ?? "Angle : bénéfice direct"}
+                    title={cardsToShow[1]?.title ?? "Image → Vidéo"}
+                    subtitle={cardsToShow[1]?.subtitle ?? "Tu fournis une image, l’IA anime."}
                     format={cardsToShow[1]?.format ?? "9:16"}
                     videoUrl={cardsToShow[1]?.videoUrl}
                   />
                 </div>
                 <div className="translate-y-2">
                   <PreviewCard
-                    title={cardsToShow[2]?.title ?? "Style Premium"}
-                    subtitle={cardsToShow[2]?.subtitle ?? "Démo + preuve"}
+                    title={cardsToShow[2]?.title ?? "Template → Remix"}
+                    subtitle={cardsToShow[2]?.subtitle ?? "Tu pars d’un style, tu variantes."}
                     format={cardsToShow[2]?.format ?? "9:16"}
                     videoUrl={cardsToShow[2]?.videoUrl}
                   />
                 </div>
                 <div className="-translate-y-6">
                   <PreviewCard
-                    title={cardsToShow[3]?.title ?? "Style Énergique"}
-                    subtitle={cardsToShow[3]?.subtitle ?? "UGC talk-to-camera"}
+                    title={cardsToShow[3]?.title ?? "Variantes A/B"}
+                    subtitle={cardsToShow[3]?.subtitle ?? "Hooks, CTA, ton, rythme."}
                     format={cardsToShow[3]?.format ?? "9:16"}
                     videoUrl={cardsToShow[3]?.videoUrl}
                   />
@@ -454,14 +452,14 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SOCIAL PROOF */}
+        {/* SOCIAL PROOF (sobre + crédible) */}
         <section className="mx-auto w-full max-w-6xl px-6 pb-16">
           <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-8">
             <p className="text-xs font-medium tracking-wide text-black/50">
-              POUR E-COMMERCE, AGENCES, ENTREPRENEURS & PLUS
+              UTILISÉ POUR DES PUBS, DU CONTENU, DES LANDINGS & DES OFFRES
             </p>
             <div className="mt-5 grid gap-3 md:grid-cols-5">
-              {["E-commerce", "Agence", "Entrepreneur", "Marque DTC", "Services"].map((x) => (
+              {["E-commerce", "Agences", "Infopreneurs", "Marques", "Services"].map((x) => (
                 <div
                   key={x}
                   className="flex items-center justify-center rounded-2xl border border-black/10 bg-black/[0.02] py-4 text-sm text-black/70"
@@ -473,15 +471,73 @@ export default function Home() {
           </div>
         </section>
 
+        {/* HOW IT WORKS */}
+        <section id="how" className="mx-auto w-full max-w-6xl px-6 py-16">
+          <div className="flex items-end justify-between gap-6">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
+                Comment ça marche (simple, rapide, efficace)
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
+                Tu n’as pas besoin de filmer : tu choisis un mode, tu donnes l’angle, tu génères.
+              </p>
+            </div>
+
+            <a
+              href="/signup"
+              className="hidden rounded-full bg-black px-5 py-2 text-sm font-semibold text-white hover:bg-black/90 md:inline-flex"
+            >
+              Démarrer
+              <span className="ml-2">→</span>
+            </a>
+          </div>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                title: "1) Choisis ton point de départ",
+                desc: "Script → vidéo, Image → vidéo, ou Template → remix. Tu pars de ce que tu as déjà.",
+                bullets: ["Script complet", "Image produit / visage", "Template prêt à adapter"],
+              },
+              {
+                title: "2) Donne l’angle (hook + intention)",
+                desc: "Tu ajustes le ton, l’énergie, et le message. L’outil s’occupe du rendu.",
+                bullets: ["Hook + bénéfice", "CTA clair", "Variantes (A/B)"],
+              },
+              {
+                title: "3) Génère, télécharge, publie",
+                desc: "Une vidéo verticale prête à être utilisée en pub ou en contenu.",
+                bullets: ["Export 9:16", "Téléchargement", "Duplication / remix"],
+              },
+            ].map((s) => (
+              <div
+                key={s.title}
+                className="rounded-3xl border border-black/10 bg-white/70 p-6 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.25)] backdrop-blur"
+              >
+                <div className="text-sm font-semibold text-black">{s.title}</div>
+                <p className="mt-2 text-sm leading-6 text-black/60">{s.desc}</p>
+                <ul className="mt-4 space-y-2 text-sm text-black/60">
+                  {s.bullets.map((b) => (
+                    <li key={b} className="flex gap-2">
+                      <Check />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* FEATURES */}
         <section id="features" className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="flex items-end justify-between gap-6">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
-                Tout ce qu’il faut pour scaler ta création vidéo
+                Ce que tu peux faire (au-delà des templates)
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-                Templates + scripts + variantes + export TikTok 9:16 avec sous-titres. Pensé performance.
+                3 modes de création + variantes : tu produis vite, tu testes, tu gardes ce qui performe.
               </p>
             </div>
 
@@ -491,35 +547,35 @@ export default function Home() {
               disabled={checkingLogin}
               className="hidden rounded-full border border-black/10 bg-black/[0.03] px-5 py-2 text-sm font-semibold text-black/80 hover:bg-black/[0.05] md:inline-flex disabled:opacity-60"
             >
-              {checkingLogin ? "Redirection…" : "Se connecter"}
+              {checkingLogin ? "Redirection…" : "Accéder à l’app"}
             </button>
           </div>
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
               {
-                title: "Templates prêts à performer",
-                desc: "UGC Ads, e-commerce, services : une base solide et rapide à adapter.",
+                title: "Script → Vidéo",
+                desc: "Tu colles ton script, tu choisis l’intention, tu génères. Parfait pour vendre une offre ou un produit.",
               },
               {
-                title: "Hooks & scripts par métier",
-                desc: "Angles de vente adaptés à ton domaine, pour aller droit au résultat.",
+                title: "Image → Vidéo",
+                desc: "Tu pars d’une image (produit / visuel) et tu racontes une histoire autour. Idéal e-commerce.",
               },
               {
-                title: "Variantes rapides (A/B)",
-                desc: "Teste plusieurs hooks, CTA et rythmes pour trouver ce qui convertit.",
+                title: "Template → Remix",
+                desc: "Tu pars d’un style et tu le fais varier avec ton prompt (hook, CTA, rythme…).",
               },
               {
-                title: "Format TikTok 9:16 + sous-titres",
-                desc: "Export vertical prêt à publier, avec sous-titres intégrés pour capter l’attention.",
+                title: "Variantes A/B ultra rapides",
+                desc: "Teste plusieurs hooks + CTA pour identifier ce qui convertit. Tu dupliques en 1 clic.",
               },
               {
-                title: "Profils & styles variés",
-                desc: "Différents styles visuels et tons (lifestyle, business, premium, dynamique…).",
+                title: "Expressions & ton naturels",
+                desc: "Plus crédible, plus “humain”, plus engageant — sans tournage.",
               },
               {
-                title: "Propulsé par Sora 2 Pro",
-                desc: "Une IA de dernière génération pour des vidéos plus cohérentes, plus naturelles, plus engageantes.",
+                title: "Export prêt à publier",
+                desc: "Format vertical 9:16. Téléchargement direct depuis la bibliothèque.",
               },
             ].map((f) => (
               <div
@@ -538,40 +594,35 @@ export default function Home() {
               <EmotionsCarousel images={emotionsImages} autoplayMs={3000} />
             </div>
           </div>
-
         </section>
 
         {/* USE CASES */}
         <section id="usecases" className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-10">
             <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
-              Pensé pour vendre (pas juste “faire une vidéo”)
+              Pour qui c’est fait
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-              Tu choisis un template + un angle, et tu sors des vidéos prêtes pour TikTok/Reels/Shorts.
+              Si tu as besoin de produire des vidéos courtes (pubs ou contenu) de manière régulière, tu es au bon endroit.
             </p>
 
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {[
                 {
                   title: "E-commerce & DTC",
-                  bullets: ["Unboxing / démo produit", "Preuves & bénéfices", "Offres, bundles, best-sellers"],
+                  bullets: ["Démo produit / bénéfices", "Angles “problème → solution”", "Offres, bundles, best-sellers"],
                 },
                 {
                   title: "Agences",
-                  bullets: [
-                    "Production créa rapide pour clients",
-                    "Variantes pour tester des hooks",
-                    "Organisation par campagnes",
-                  ],
+                  bullets: ["Production rapide pour clients", "Variantes pour tests A/B", "Organisation par campagnes"],
                 },
                 {
-                  title: "Entrepreneurs",
-                  bullets: ["Vidéos pour vendre une offre / service", "Angles “problème → solution”", "CTA clairs, rythme TikTok"],
+                  title: "Coachs / infopreneurs",
+                  bullets: ["Vendre une offre", "Pitch + objections", "CTA clairs et courts"],
                 },
                 {
                   title: "Services & local",
-                  bullets: ["Présentation / résultats / témoignages", "Objections (prix, délai, qualité)", "Formats courts pour réseaux"],
+                  bullets: ["Avant / après, résultats", "Preuve sociale", "Formats courts pour réseaux"],
                 },
               ].map((c) => (
                 <div key={c.title} className="rounded-3xl border border-black/10 bg-white p-6">
@@ -594,7 +645,7 @@ export default function Home() {
         <section id="pricing" className="mx-auto w-full max-w-6xl px-6 py-16">
           <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">Tarifs</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-            Paiement à la vidéo ou en packs dégressifs.
+            Choisis un pack. Tu consommes des crédits à la génération.
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-4">
@@ -631,22 +682,25 @@ export default function Home() {
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {[
                 {
-                  q: "Quel format je reçois ?",
-                  a: "Du vertical 9:16 (format TikTok / Réels / Shorts), prêt à publier, avec sous-titres intégrés.",
+                  q: "Je peux créer sans template ?",
+                  a: "Oui. Tu peux générer à partir d’un script (texte) ou d’une image. Les templates servent aussi à accélérer quand tu veux un style précis.",
                 },
                 {
-                  q: "C’est pour qui ?",
-                  a: "E-commerce, agences, entrepreneurs, services : si tu fais de l’acquisition via vidéos courtes, c’est fait pour toi.",
+                  q: "Quel format je reçois ?",
+                  a: "Du vertical 9:16 prêt pour Reels / Shorts / TikTok. Tu télécharges depuis la bibliothèque.",
                 },
                 {
                   q: "Je peux faire plusieurs variantes ?",
-                  a: "Oui. L’idée est justement de tester plusieurs hooks/CTA/rythmes pour trouver ce qui convertit.",
+                  a: "Oui. Duplique une vidéo et change uniquement le hook, le CTA ou le ton pour tester.",
                 },
                 {
-                  q: "Pourquoi “Sora 2 Pro” ?",
-                  a: "Pour obtenir des vidéos plus cohérentes et naturelles. Tu gagnes en crédibilité et en qualité perçue.",
+                  q: "Ça prend combien de temps ?",
+                  a: "Quelques minutes en général. Les vidéos en cours s’affichent dans la bibliothèque avec un statut.",
                 },
-                { q: "Je dois tourner quelque chose ?", a: "Non. Tu pars d’un template + un angle, puis tu génères." },
+                {
+                  q: "Je dois filmer quelque chose ?",
+                  a: "Non. Tout se fait depuis l’app (script, image ou template).",
+                },
               ].map((i) => (
                 <div key={i.q} className="rounded-3xl border border-black/10 bg-white p-6">
                   <div className="text-sm font-semibold text-black">{i.q}</div>
@@ -657,31 +711,28 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FINAL CTA (✅ image à droite sur desktop / ✅ en dessous sur mobile + animation légère) */}
+        {/* FINAL CTA */}
         <section className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="relative overflow-hidden rounded-3xl border border-black/10 bg-gradient-to-r from-indigo-500/12 via-violet-500/10 to-fuchsia-500/12 p-8 md:p-10">
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-black/5 blur-3xl" />
 
             <div className="grid items-center gap-6 md:grid-cols-[1fr_420px]">
-              {/* LEFT */}
               <div>
                 <h3 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
-                  Prêt à scaler tes pubs TikTok ?
+                  Lance ta première vidéo aujourd’hui.
                 </h3>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-                  Templates + scripts + variantes + export 9:16 avec sous-titres.
+                  Script, image ou template — puis variantes A/B. Télécharge, publie, et recommence.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleLoginClick}
-                    disabled={checkingLogin}
-                    className="inline-flex h-12 items-center justify-center rounded-full bg-black px-6 text-sm font-semibold text-white hover:bg-black/90 disabled:opacity-60"
+                  <Link
+                    href="/signup"
+                    className="inline-flex h-12 items-center justify-center rounded-full bg-black px-6 text-sm font-semibold text-white hover:bg-black/90"
                   >
-                    {checkingLogin ? "Redirection…" : "Se connecter"}
+                    Créer ma première vidéo
                     <span className="ml-2">→</span>
-                  </button>
+                  </Link>
 
                   <a
                     className="inline-flex h-12 items-center justify-center rounded-full border border-black/10 bg-white/70 px-6 text-sm font-semibold text-black/80 hover:bg-black/[0.05]"
@@ -692,7 +743,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* RIGHT (desktop) / BELOW (mobile) */}
               <div className="relative md:justify-self-end">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -705,7 +755,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* animation keyframes (légère) */}
           <style jsx global>{`
             @keyframes float {
               0%,
