@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     const video = await openai.videos.create({
       model: "sora-2-pro",
       prompt: prompt_final,
-      seconds: "12",
+      seconds: "4",
       size: "720x1280",
     });
 

@@ -103,8 +103,8 @@ export async function POST(req: Request) {
       model: "sora-2-pro",
       prompt,
       input_reference: normalizedImage,
-      seconds: "12",
-      size: "1024x1792",
+      seconds: "4",
+      size: "720x1280",
     });
 
     /* ---------------- UPDATE JOB ---------------- */
