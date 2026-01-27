@@ -1,3 +1,4 @@
+// JobPoller.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -32,9 +33,8 @@ export default function JobPoller() {
         const ids = (jobs ?? []).map((j: any) => j.id).filter(Boolean);
         if (ids.length === 0) return;
 
-        let shouldRefetchCredits = false;
-
-        await Promise.all(
+        // Collecte des statuts retournés
+        const results = await Promise.all(
           ids.map(async (id: string) => {
             try {
               const res = await fetch(`/api/video-jobs/${id}/refresh`, {
@@ -42,20 +42,27 @@ export default function JobPoller() {
                 headers: { Authorization: `Bearer ${session.access_token}` },
               });
 
-              if (!res.ok) return;
-
-              const json = await res.json().catch(() => null);
-              if (!json) return;
-
-              // ✅ Dès qu’un job passe done (et donc débit potentiellement fait), on refetch
-              if (json.status === "done" || json.charged === true) {
-                shouldRefetchCredits = true;
-              }
+              if (!res.ok) return null;
+              return await res.json().catch(() => null);
             } catch {
-              // ignore
+              return null;
             }
           })
         );
+
+        /**
+         * Nouveau modèle crédits :
+         * - débit fait AU LANCEMENT (queued)
+         * - refund si status === "failed"
+         * - "done" ne touche plus aux crédits
+         *
+         * Realtime met normalement le solde à jour,
+         * refetch ici = simple sécurité.
+         */
+        const shouldRefetchCredits = results.some((r: any) => {
+          if (!r) return false;
+          return r.status === "failed";
+        });
 
         if (shouldRefetchCredits) {
           await refetch();
@@ -65,7 +72,7 @@ export default function JobPoller() {
       }
     };
 
-    // tick immédiat + toutes les 6s (tu peux mettre 10s si tu veux réduire)
+    // tick immédiat + toutes les 6s
     tick();
     const t = setInterval(tick, 6000);
     return () => clearInterval(t);

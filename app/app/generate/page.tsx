@@ -1,9 +1,10 @@
+// /app/app/generate/page.tsx
 "use client";
 
 import { supabase } from "@/lib/supabaseClient";
 import { useCredits } from "@/lib/useCredits";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type Tab = "text" | "remix" | "image";
 
@@ -13,7 +14,7 @@ type Template = {
   description: string | null;
   category: string | null;
   preview_video_url: string | null;
-  template_video_id: string | null; // gardé côté data, mais on ne l'affiche plus dans l'UI
+  template_video_id: string | null;
 };
 
 function Card({
@@ -114,7 +115,7 @@ function NoCreditsBanner({ onBuy }: { onBuy: () => void }) {
 
 export default function CreatePage() {
   const router = useRouter();
-  const { credits, loading: creditsLoading } = useCredits();
+  const { credits, loading: creditsLoading, applyOptimisticDelta } = useCredits();
 
   const [tab, setTab] = useState<Tab>("text");
   const [prompt, setPrompt] = useState("");
@@ -124,10 +125,7 @@ export default function CreatePage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
 
-  // ✅ AUCUNE sélection par défaut
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    null
-  );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // Categories pills
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -144,9 +142,7 @@ export default function CreatePage() {
       setTemplatesLoading(true);
       const { data, error } = await supabase
         .from("templates")
-        .select(
-          "id, name, description, category, preview_video_url, template_video_id"
-        )
+        .select("id, name, description, category, preview_video_url, template_video_id")
         .eq("is_active", true)
         .order("position", { ascending: true });
 
@@ -155,7 +151,6 @@ export default function CreatePage() {
     };
 
     loadTemplates();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -186,22 +181,16 @@ export default function CreatePage() {
     if (selectedCategory === "uncategorized") {
       return templates.filter((t) => !(t.category ?? "").trim());
     }
-    return templates.filter(
-      (t) => (t.category ?? "").trim() === selectedCategory
-    );
+    return templates.filter((t) => (t.category ?? "").trim() === selectedCategory);
   }, [templates, selectedCategory]);
 
-  // ✅ si on change de catégorie et que le template sélectionné n'est plus visible -> on désélectionne
   useEffect(() => {
     if (tab !== "remix") return;
     if (!selectedTemplateId) return;
 
-    const stillVisible = templatesFiltered.some(
-      (t) => t.id === selectedTemplateId
-    );
+    const stillVisible = templatesFiltered.some((t) => t.id === selectedTemplateId);
     if (!stillVisible) setSelectedTemplateId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, templatesFiltered.length, tab]);
+  }, [selectedCategory, templatesFiltered, tab, selectedTemplateId]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) ?? null,
@@ -252,6 +241,9 @@ export default function CreatePage() {
     if (res.status === 402) return handleNoCredits(data.error);
     if (!res.ok) return alert(data.error || "Erreur lors de la création du job");
 
+    // ✅ UI instant : le débit se fait déjà en DB au queued, on reflète immédiatement côté UI
+    applyOptimisticDelta(-1);
+
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
 
@@ -286,8 +278,10 @@ export default function CreatePage() {
     setSubmitting(false);
 
     if (res.status === 402) return handleNoCredits(data.error);
-    if (!res.ok)
-      return alert(data.error || "Erreur lors de la création du remix");
+    if (!res.ok) return alert(data.error || "Erreur lors de la création du remix");
+
+    // ✅ UI instant
+    applyOptimisticDelta(-1);
 
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
@@ -321,8 +315,10 @@ export default function CreatePage() {
     setSubmitting(false);
 
     if (res.status === 402) return handleNoCredits(data.error);
-    if (!res.ok)
-      return alert(data.error || "Erreur lors de la création (image → vidéo)");
+    if (!res.ok) return alert(data.error || "Erreur lors de la création (image → vidéo)");
+
+    // ✅ UI instant
+    applyOptimisticDelta(-1);
 
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
@@ -344,11 +340,8 @@ export default function CreatePage() {
       ? "Remixer à partir du template"
       : "Générer (Image → Vidéo)";
 
-  // ✅ AU CLICK SUR SELECT: scroll en bas de page
   const selectTemplateAndScrollToBottom = (id: string) => {
     setSelectedTemplateId(id);
-
-    // petit délai pour laisser React rerender
     setTimeout(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     }, 80);
@@ -379,8 +372,7 @@ export default function CreatePage() {
               Créer une vidéo
             </h1>
             <p style={{ marginTop: 8, opacity: 0.75, maxWidth: 760 }}>
-              Choisis un mode de génération. Tu peux générer depuis du texte,
-              remixer un template vidéo, ou partir d’une image.
+              Choisis un mode de génération. Tu peux générer depuis du texte, remixer un template vidéo, ou partir d’une image.
             </p>
           </div>
 
@@ -406,9 +398,7 @@ export default function CreatePage() {
                 💳
               </div>
               <div style={{ minWidth: 160 }}>
-                <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>
-                  Mon solde
-                </div>
+                <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>Mon solde</div>
                 <div style={{ opacity: 0.8, marginTop: 2 }}>
                   {creditsLoading ? "Chargement…" : `${credits ?? 0} crédit(s)`}
                 </div>
@@ -453,19 +443,14 @@ export default function CreatePage() {
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 900, fontSize: 16 }}>
-                        Template
-                      </div>
+                      <div style={{ fontWeight: 900, fontSize: 16 }}>Template</div>
                       <div style={{ opacity: 0.75, marginTop: 4 }}>
-                        Choisis un template, puis écris comment tu veux le
-                        transformer (texte, ton, offre, cible).
+                        Choisis un template, puis écris comment tu veux le transformer (texte, ton, offre, cible).
                       </div>
                     </div>
 
                     <div style={{ fontSize: 12, opacity: 0.75 }}>
-                      {templatesLoading
-                        ? "Chargement…"
-                        : `${templatesFiltered.length} template(s)`}
+                      {templatesLoading ? "Chargement…" : `${templatesFiltered.length} template(s)`}
                     </div>
                   </div>
 
@@ -484,24 +469,16 @@ export default function CreatePage() {
                         active={selectedCategory === c}
                         onClick={() => setSelectedCategory(c)}
                       >
-                        {c === "all"
-                          ? "Tous"
-                          : c === "uncategorized"
-                          ? "Autres"
-                          : c}
+                        {c === "all" ? "Tous" : c === "uncategorized" ? "Autres" : c}
                       </Pill>
                     ))}
                   </div>
 
                   <div className="templatesGrid">
                     {templatesLoading ? (
-                      <div style={{ opacity: 0.8 }}>
-                        Chargement des templates…
-                      </div>
+                      <div style={{ opacity: 0.8 }}>Chargement des templates…</div>
                     ) : templatesFiltered.length === 0 ? (
-                      <div style={{ opacity: 0.8 }}>
-                        Aucun template dans cette catégorie.
-                      </div>
+                      <div style={{ opacity: 0.8 }}>Aucun template dans cette catégorie.</div>
                     ) : (
                       templatesFiltered.map((t) => (
                         <TemplateCard
@@ -522,12 +499,9 @@ export default function CreatePage() {
 
               {tab === "image" && (
                 <>
-                  <div style={{ fontWeight: 900, fontSize: 16 }}>
-                    Image source
-                  </div>
+                  <div style={{ fontWeight: 900, fontSize: 16 }}>Image source</div>
                   <div style={{ opacity: 0.75, marginTop: 4 }}>
-                    Ajoute une image, puis écris un prompt pour générer la vidéo
-                    à partir de cette image.
+                    Ajoute une image, puis écris un prompt pour générer la vidéo à partir de cette image.
                   </div>
 
                   <div
@@ -540,29 +514,18 @@ export default function CreatePage() {
                   >
                     <Card>
                       <div style={{ padding: 14 }}>
-                        <div style={{ fontWeight: 800, marginBottom: 8 }}>
-                          Choisir une image
-                        </div>
+                        <div style={{ fontWeight: 800, marginBottom: 8 }}>Choisir une image</div>
                         <input
                           type="file"
                           accept="image/*"
                           onChange={(e) => {
                             const f = e.target.files?.[0] ?? null;
                             setImageFile(f);
-                            if (imagePreviewUrl)
-                              URL.revokeObjectURL(imagePreviewUrl);
-                            setImagePreviewUrl(
-                              f ? URL.createObjectURL(f) : null
-                            );
+                            if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+                            setImagePreviewUrl(f ? URL.createObjectURL(f) : null);
                           }}
                         />
-                        <div
-                          style={{
-                            fontSize: 12,
-                            opacity: 0.7,
-                            marginTop: 8,
-                          }}
-                        >
+                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
                           JPG/PNG recommandé, bonne lumière, visage net.
                         </div>
                       </div>
@@ -570,9 +533,7 @@ export default function CreatePage() {
 
                     <Card>
                       <div style={{ padding: 14 }}>
-                        <div style={{ fontWeight: 800, marginBottom: 8 }}>
-                          Aperçu
-                        </div>
+                        <div style={{ fontWeight: 800, marginBottom: 8 }}>Aperçu</div>
                         {imagePreviewUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -585,9 +546,7 @@ export default function CreatePage() {
                             }}
                           />
                         ) : (
-                          <div style={{ opacity: 0.75 }}>
-                            Aucune image sélectionnée.
-                          </div>
+                          <div style={{ opacity: 0.75 }}>Aucune image sélectionnée.</div>
                         )}
                       </div>
                     </Card>
@@ -660,9 +619,7 @@ export default function CreatePage() {
                     padding: "12px 16px",
                     borderRadius: 14,
                     border: "1px solid rgba(0,0,0,0.15)",
-                    background: canGenerate
-                      ? "rgba(0,0,0,0.88)"
-                      : "rgba(0,0,0,0.25)",
+                    background: canGenerate ? "rgba(0,0,0,0.88)" : "rgba(0,0,0,0.25)",
                     color: "white",
                     cursor: canGenerate ? "pointer" : "not-allowed",
                     fontWeight: 900,
@@ -684,10 +641,7 @@ export default function CreatePage() {
                 </div>
               </div>
 
-              {/* ✅ BANNIÈRE SOUS LE BOUTON GÉNÉRER (si crédits = 0) */}
-              {noCredits && (
-                <NoCreditsBanner onBuy={() => router.push("/app/credits")} />
-              )}
+              {noCredits && <NoCreditsBanner onBuy={() => router.push("/app/credits")} />}
 
               {tab === "remix" && !selectedTemplateId && (
                 <div
@@ -800,7 +754,6 @@ function TemplateCard({
               }}
             />
 
-            {/* ✅ TOP PILLS (gap garanti, ne se touchent plus) */}
             <div className="topPills" aria-hidden="true">
               {selected ? (
                 <div className="selectedBadge" title="Template sélectionné">
@@ -825,9 +778,7 @@ function TemplateCard({
                 padding: "10px 12px",
                 borderRadius: 14,
                 border: "1px solid rgba(0,0,0,0.12)",
-                background: selected
-                  ? "rgba(16, 185, 129, 0.95)"
-                  : "rgba(0,0,0,0.88)",
+                background: selected ? "rgba(16, 185, 129, 0.95)" : "rgba(0,0,0,0.88)",
                 color: "#fff",
                 fontWeight: 900,
                 cursor: "pointer",
@@ -839,9 +790,7 @@ function TemplateCard({
             </button>
           </div>
         ) : (
-          <div style={{ padding: 18, opacity: 0.75 }}>
-            Aucun preview_video_url
-          </div>
+          <div style={{ padding: 18, opacity: 0.75 }}>Aucun preview_video_url</div>
         )}
 
         <div className="tplBody" style={{ padding: 14 }}>
@@ -849,15 +798,10 @@ function TemplateCard({
             {t.name}
           </div>
 
-          <div
-            className="tplMeta"
-            style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}
-          >
+          <div className="tplMeta" style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
             Catégorie :{" "}
             <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
           </div>
-
-          {/* ✅ description supprimée */}
         </div>
       </Card>
 
@@ -868,7 +812,6 @@ function TemplateCard({
           display: block;
         }
 
-        /* top pills layout */
         .tplCard :global(.topPills) {
           position: absolute;
           top: 10px;
@@ -877,9 +820,9 @@ function TemplateCard({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px; /* 👈 espace entre les 2 pills */
+          gap: 10px;
           z-index: 6;
-          pointer-events: none; /* ne gêne pas hover/click vidéo */
+          pointer-events: none;
         }
 
         .tplCard :global(.selectedBadge) {
@@ -902,7 +845,6 @@ function TemplateCard({
           white-space: nowrap;
         }
 
-        /* bouton select */
         .tplCard :global(.selectBtn) {
           z-index: 4;
           word-break: keep-all;
@@ -913,17 +855,13 @@ function TemplateCard({
             left: 50% !important;
             right: auto !important;
             transform: translateX(-50%) !important;
-
             width: auto !important;
             max-width: calc(100% - 24px) !important;
-
             padding: 9px 14px !important;
             border-radius: 999px !important;
-
             font-size: 12px !important;
             letter-spacing: 0.15px !important;
             line-height: 1 !important;
-
             white-space: nowrap !important;
             overflow: visible !important;
             text-overflow: clip !important;
@@ -935,7 +873,6 @@ function TemplateCard({
             padding: 8px 10px !important;
             border-radius: 12px !important;
             font-size: 12px !important;
-
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;

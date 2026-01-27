@@ -1,3 +1,4 @@
+// /lib/useCredits.ts
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,6 +10,18 @@ export function useCredits() {
 
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
+
+  // ✅ Optimistic UI (pour update instant côté UI)
+  const optimisticRef = useRef(0);
+  const applyOptimisticDelta = useCallback((delta: number) => {
+    optimisticRef.current += delta;
+
+    setCredits((c) => {
+      const base = typeof c === "number" ? c : 0;
+      // clamp à 0 pour éviter affichage négatif
+      return Math.max(0, base + delta);
+    });
+  }, []);
 
   // ✅ Realtime channel (un seul à la fois)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -42,8 +55,12 @@ export function useCredits() {
           },
           (payload) => {
             const newCredits = (payload.new as any)?.credits;
+
             if (typeof newCredits === "number") {
-              setCredits(newCredits); // ✅ update instant
+              // ✅ Realtime = source de vérité
+              // On reset l'optimistic et on colle la valeur DB.
+              optimisticRef.current = 0;
+              setCredits(newCredits);
             }
           }
         )
@@ -67,6 +84,7 @@ export function useCredits() {
 
       if (!user) {
         if (mountedRef.current) {
+          optimisticRef.current = 0;
           setCredits(null);
           setLoading(false);
         }
@@ -87,8 +105,11 @@ export function useCredits() {
 
       if (error) {
         console.error("useCredits load error:", error);
+        optimisticRef.current = 0;
         setCredits(0);
       } else {
+        // ✅ DB = source de vérité
+        optimisticRef.current = 0;
         setCredits(data?.credits ?? 0);
       }
 
@@ -121,5 +142,5 @@ export function useCredits() {
     await load();
   }, [load]);
 
-  return { credits, loading, refetch };
+  return { credits, loading, refetch, applyOptimisticDelta };
 }

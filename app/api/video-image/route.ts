@@ -1,3 +1,4 @@
+// /app/api/video-image/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
@@ -24,6 +25,11 @@ const supabase = createClient(
 
 const TARGET_WIDTH = 1024;
 const TARGET_HEIGHT = 1792;
+
+function isInsufficientCreditsError(message?: string) {
+  const m = (message ?? "").toUpperCase();
+  return m.includes("INSUFFICIENT_CREDITS");
+}
 
 export async function POST(req: Request) {
   try {
@@ -57,25 +63,22 @@ export async function POST(req: Request) {
     /* ---------------- IMAGE NORMALIZATION ---------------- */
     const inputBuffer = Buffer.from(await image.arrayBuffer());
 
-    // Resize proportionnel + padding BLANC (aucune coupe)
     const normalizedBuffer = await sharp(inputBuffer)
       .resize(TARGET_WIDTH, TARGET_HEIGHT, {
         fit: "contain",
-        background: {
-          r: 255,
-          g: 255,
-          b: 255,
-        },
+        background: { r: 255, g: 255, b: 255 },
       })
       .jpeg({ quality: 92 })
       .toBuffer();
 
-    // ✅ Fix TS/Vercel: Buffer -> Uint8Array pour être compatible BlobPart
+    // ✅ Fix TS/Vercel: Buffer -> Uint8Array pour BlobPart
     const normalizedImage = new File([new Uint8Array(normalizedBuffer)], "input.jpg", {
       type: "image/jpeg",
     });
 
-    /* ---------------- CREATE JOB ---------------- */
+    /* ---------------- CREATE JOB ----------------
+       ✅ status queued => trigger DB débite (ou throw INSUFFICIENT_CREDITS)
+    */
     const { data: job, error: jobErr } = await supabase
       .from("video_jobs")
       .insert({
@@ -86,12 +89,22 @@ export async function POST(req: Request) {
         status: "queued",
         provider: "openai",
         progress: 0,
+        job_type: "generate",
+        cost_credits: 1,
       })
       .select("id")
       .single();
 
     if (jobErr || !job) {
       console.error("❌ Job insert error:", jobErr);
+
+      if (isInsufficientCreditsError(jobErr?.message)) {
+        return NextResponse.json(
+          { error: "Plus de crédits. Achète des crédits pour continuer." },
+          { status: 402 }
+        );
+      }
+
       return NextResponse.json(
         { error: jobErr?.message ?? "Failed to create job" },
         { status: 500 }
@@ -99,16 +112,35 @@ export async function POST(req: Request) {
     }
 
     /* ---------------- SORA CALL ---------------- */
-    const video = await openai.videos.create({
-      model: "sora-2-pro",
-      prompt,
-      input_reference: normalizedImage,
-      seconds: "4",
-      size: "720x1280",
-    });
+    let video: any;
+    try {
+      video = await openai.videos.create({
+        model: "sora-2-pro",
+        prompt,
+        input_reference: normalizedImage,
+        seconds: "12",
+        size: "720x1280",
+      });
+    } catch (err: any) {
+      console.error("❌ Sora create failed:", err);
+
+      // ✅ failed => trigger DB refund
+      await supabase
+        .from("video_jobs")
+        .update({
+          status: "failed",
+          error_message: err?.message ?? "Sora create failed",
+        })
+        .eq("id", job.id);
+
+      return NextResponse.json(
+        { error: "Failed to create video with provider" },
+        { status: 500 }
+      );
+    }
 
     /* ---------------- UPDATE JOB ---------------- */
-    await supabase
+    const { error: updErr } = await supabase
       .from("video_jobs")
       .update({
         provider_video_id: video.id,
@@ -117,10 +149,27 @@ export async function POST(req: Request) {
       })
       .eq("id", job.id);
 
+    if (updErr) {
+      console.error("❌ FAILED to update provider_video_id:", updErr);
+
+      // ✅ failed => trigger DB refund
+      await supabase
+        .from("video_jobs")
+        .update({ status: "failed", error_message: updErr.message })
+        .eq("id", job.id);
+
+      return NextResponse.json(
+        { error: "Failed to update job after Sora create", details: updErr.message },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       job: {
         id: job.id,
         status: "processing",
+        provider_video_id: video.id,
+        progress: (video as any).progress ?? 0,
       },
     });
   } catch (err: any) {

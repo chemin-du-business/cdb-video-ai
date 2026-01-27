@@ -1,3 +1,4 @@
+// /app/api/video-jobs/route.ts
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
@@ -15,6 +16,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function isInsufficientCreditsError(message?: string) {
+  const m = (message ?? "").toUpperCase();
+  return m.includes("INSUFFICIENT_CREDITS");
+}
+
 export async function POST(req: Request) {
   try {
     const { template_id, user_prompt } = await req.json();
@@ -25,7 +31,9 @@ export async function POST(req: Request) {
 
     // 🔐 Auth utilisateur via token Supabase
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!authHeader) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: authErr } = await supabase.auth.getUser(token);
@@ -33,25 +41,6 @@ export async function POST(req: Request) {
 
     if (authErr || !user) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-    }
-
-    /**
-     * ✅ CHECK CREDITS (NE DÉBITE PAS ICI)
-     */
-    const { data: profile, error: profErr } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
-
-    const credits = Number(profile?.credits ?? 0);
-    if (credits <= 0) {
-      return NextResponse.json(
-        { error: "Plus de crédits. Achète des crédits pour continuer." },
-        { status: 402 }
-      );
     }
 
     /**
@@ -74,6 +63,7 @@ export async function POST(req: Request) {
 
     /**
      * 1) CRÉATION DU JOB
+     * ✅ status: "queued" => trigger DB débite immédiatement (ou throw INSUFFICIENT_CREDITS)
      */
     const { data: job, error: jobErr } = await supabase
       .from("video_jobs")
@@ -85,12 +75,22 @@ export async function POST(req: Request) {
         status: "queued",
         provider: "openai",
         progress: 0,
+        job_type: template_id ? "remix" : "generate", // optionnel
+        cost_credits: 1,
       })
       .select("id")
       .single();
 
     if (jobErr || !job) {
       console.error("❌ Job insert error:", jobErr);
+
+      if (isInsufficientCreditsError(jobErr?.message)) {
+        return NextResponse.json(
+          { error: "Plus de crédits. Achète des crédits pour continuer." },
+          { status: 402 }
+        );
+      }
+
       return NextResponse.json(
         { error: jobErr?.message ?? "Failed to create job" },
         { status: 500 }
@@ -103,12 +103,31 @@ export async function POST(req: Request) {
     /**
      * 2) APPEL SORA — QUALITÉ MAX
      */
-    const video = await openai.videos.create({
-      model: "sora-2-pro",
-      prompt: prompt_final,
-      seconds: "12",
-      size: "720x1280",
-    });
+    let video: any;
+    try {
+      video = await openai.videos.create({
+        model: "sora-2-pro",
+        prompt: prompt_final,
+        seconds: "12",
+        size: "720x1280",
+      });
+    } catch (e: any) {
+      console.error("❌ Sora create failed:", e);
+
+      // ✅ failed => trigger DB refund
+      await supabase
+        .from("video_jobs")
+        .update({
+          status: "failed",
+          error_message: e?.message ?? "Sora create failed",
+        })
+        .eq("id", job.id);
+
+      return NextResponse.json(
+        { error: "Failed to create video with provider" },
+        { status: 500 }
+      );
+    }
 
     console.log("✅ Sora created:", video.id);
 
@@ -127,6 +146,7 @@ export async function POST(req: Request) {
     if (updErr) {
       console.error("❌ FAILED to update provider_video_id:", updErr);
 
+      // ✅ failed => trigger DB refund
       await supabase
         .from("video_jobs")
         .update({ status: "failed", error_message: updErr.message })
@@ -148,6 +168,9 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error("❌ /api/video-jobs error:", err);
-    return NextResponse.json({ error: err?.message ?? "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Internal server error" },
+      { status: 500 }
+    );
   }
 }
