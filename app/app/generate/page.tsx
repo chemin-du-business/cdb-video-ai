@@ -115,7 +115,9 @@ function NoCreditsBanner({ onBuy }: { onBuy: () => void }) {
 
 export default function CreatePage() {
   const router = useRouter();
-  const { credits, loading: creditsLoading, applyOptimisticDelta } = useCredits();
+
+  // ✅ IMPORTANT: pas d’optimistic ici (sinon -2 en prod si DB débite déjà)
+  const { credits, loading: creditsLoading } = useCredits();
 
   const [tab, setTab] = useState<Tab>("text");
   const [prompt, setPrompt] = useState("");
@@ -124,7 +126,6 @@ export default function CreatePage() {
   // Remix tab
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
-
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // Categories pills
@@ -178,12 +179,11 @@ export default function CreatePage() {
 
   const templatesFiltered = useMemo(() => {
     if (selectedCategory === "all") return templates;
-    if (selectedCategory === "uncategorized") {
-      return templates.filter((t) => !(t.category ?? "").trim());
-    }
+    if (selectedCategory === "uncategorized") return templates.filter((t) => !(t.category ?? "").trim());
     return templates.filter((t) => (t.category ?? "").trim() === selectedCategory);
   }, [templates, selectedCategory]);
 
+  // si template sélectionné sort du filtre => reset
   useEffect(() => {
     if (tab !== "remix") return;
     if (!selectedTemplateId) return;
@@ -198,9 +198,7 @@ export default function CreatePage() {
   );
 
   const requireSession = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
       alert("Session expirée, merci de te reconnecter.");
@@ -216,10 +214,7 @@ export default function CreatePage() {
   };
 
   const runTextToVideo = async () => {
-    if (!prompt.trim()) {
-      alert("Merci de décrire ce que la personne doit présenter.");
-      return;
-    }
+    if (!prompt.trim()) return alert("Merci de décrire ce que la personne doit présenter.");
 
     const session = await requireSession();
     if (!session) return;
@@ -241,21 +236,12 @@ export default function CreatePage() {
     if (res.status === 402) return handleNoCredits(data.error);
     if (!res.ok) return alert(data.error || "Erreur lors de la création du job");
 
-    // ✅ UI instant : le débit se fait déjà en DB au queued, on reflète immédiatement côté UI
-    applyOptimisticDelta(-1);
-
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
 
   const runTemplateRemix = async () => {
-    if (!selectedTemplateId) {
-      alert("Sélectionne un template.");
-      return;
-    }
-    if (!prompt.trim()) {
-      alert("Ajoute une consigne (prompt) pour le remix.");
-      return;
-    }
+    if (!selectedTemplateId) return alert("Sélectionne un template.");
+    if (!prompt.trim()) return alert("Ajoute une consigne (prompt) pour le remix.");
 
     const session = await requireSession();
     if (!session) return;
@@ -268,10 +254,7 @@ export default function CreatePage() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({
-        template_id: selectedTemplateId,
-        user_prompt: prompt,
-      }),
+      body: JSON.stringify({ template_id: selectedTemplateId, user_prompt: prompt }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -280,21 +263,12 @@ export default function CreatePage() {
     if (res.status === 402) return handleNoCredits(data.error);
     if (!res.ok) return alert(data.error || "Erreur lors de la création du remix");
 
-    // ✅ UI instant
-    applyOptimisticDelta(-1);
-
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
 
   const runImageToVideo = async () => {
-    if (!imageFile) {
-      alert("Ajoute une image.");
-      return;
-    }
-    if (!prompt.trim()) {
-      alert("Ajoute un prompt (ce que doit raconter/faire la vidéo).");
-      return;
-    }
+    if (!imageFile) return alert("Ajoute une image.");
+    if (!prompt.trim()) return alert("Ajoute un prompt (ce que doit raconter/faire la vidéo).");
 
     const session = await requireSession();
     if (!session) return;
@@ -317,15 +291,11 @@ export default function CreatePage() {
     if (res.status === 402) return handleNoCredits(data.error);
     if (!res.ok) return alert(data.error || "Erreur lors de la création (image → vidéo)");
 
-    // ✅ UI instant
-    applyOptimisticDelta(-1);
-
     router.push(`/app/library?jobCreated=${data.job.id}`);
   };
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
-
     if (tab === "text") return runTextToVideo();
     if (tab === "remix") return runTemplateRemix();
     return runImageToVideo();
@@ -342,9 +312,7 @@ export default function CreatePage() {
 
   const selectTemplateAndScrollToBottom = (id: string) => {
     setSelectedTemplateId(id);
-    setTimeout(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-    }, 80);
+    setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), 80);
   };
 
   return (
@@ -358,43 +326,17 @@ export default function CreatePage() {
     >
       <div style={{ maxWidth: 1080, margin: "0 auto" }}>
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <h1 style={{ fontSize: 28, margin: 0, letterSpacing: -0.6 }}>
-              Créer une vidéo
-            </h1>
+            <h1 style={{ fontSize: 28, margin: 0, letterSpacing: -0.6 }}>Créer une vidéo</h1>
             <p style={{ marginTop: 8, opacity: 0.75, maxWidth: 760 }}>
               Choisis un mode de génération. Tu peux générer depuis du texte, remixer un template vidéo, ou partir d’une image.
             </p>
           </div>
 
           <Card>
-            <div
-              style={{
-                padding: 14,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 12,
-                  display: "grid",
-                  placeItems: "center",
-                  background: "rgba(0,0,0,0.06)",
-                }}
-              >
+            <div style={{ padding: 14, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 12, display: "grid", placeItems: "center", background: "rgba(0,0,0,0.06)" }}>
                 💳
               </div>
               <div style={{ minWidth: 160 }}>
@@ -408,24 +350,10 @@ export default function CreatePage() {
         </div>
 
         {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            marginTop: 18,
-            marginBottom: 18,
-            flexWrap: "wrap",
-          }}
-        >
-          <Pill active={tab === "text"} onClick={() => setTab("text")}>
-            Texte → Vidéo
-          </Pill>
-          <Pill active={tab === "remix"} onClick={() => setTab("remix")}>
-            Template Vidéo → Remix
-          </Pill>
-          <Pill active={tab === "image"} onClick={() => setTab("image")}>
-            Image → Vidéo
-          </Pill>
+        <div style={{ display: "flex", gap: 10, marginTop: 18, marginBottom: 18, flexWrap: "wrap" }}>
+          <Pill active={tab === "text"} onClick={() => setTab("text")}>Texte → Vidéo</Pill>
+          <Pill active={tab === "remix"} onClick={() => setTab("remix")}>Template Vidéo → Remix</Pill>
+          <Pill active={tab === "image"} onClick={() => setTab("image")}>Image → Vidéo</Pill>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
@@ -433,15 +361,7 @@ export default function CreatePage() {
             <div style={{ padding: 18 }}>
               {tab === "remix" && (
                 <>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                     <div>
                       <div style={{ fontWeight: 900, fontSize: 16 }}>Template</div>
                       <div style={{ opacity: 0.75, marginTop: 4 }}>
@@ -454,21 +374,10 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* Catégories en pills */}
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      flexWrap: "wrap",
-                      marginTop: 12,
-                    }}
-                  >
+                  {/* Catégories */}
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
                     {categories.map((c) => (
-                      <Pill
-                        key={c}
-                        active={selectedCategory === c}
-                        onClick={() => setSelectedCategory(c)}
-                      >
+                      <Pill key={c} active={selectedCategory === c} onClick={() => setSelectedCategory(c)}>
                         {c === "all" ? "Tous" : c === "uncategorized" ? "Autres" : c}
                       </Pill>
                     ))}
@@ -504,14 +413,7 @@ export default function CreatePage() {
                     Ajoute une image, puis écris un prompt pour générer la vidéo à partir de cette image.
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: 14,
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 12,
-                    }}
-                  >
+                  <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <Card>
                       <div style={{ padding: 14 }}>
                         <div style={{ fontWeight: 800, marginBottom: 8 }}>Choisir une image</div>
@@ -536,15 +438,7 @@ export default function CreatePage() {
                         <div style={{ fontWeight: 800, marginBottom: 8 }}>Aperçu</div>
                         {imagePreviewUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={imagePreviewUrl}
-                            alt="preview"
-                            style={{
-                              width: "100%",
-                              borderRadius: 14,
-                              display: "block",
-                            }}
-                          />
+                          <img src={imagePreviewUrl} alt="preview" style={{ width: "100%", borderRadius: 14, display: "block" }} />
                         ) : (
                           <div style={{ opacity: 0.75 }}>Aucune image sélectionnée.</div>
                         )}
@@ -603,15 +497,7 @@ export default function CreatePage() {
                 }}
               />
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  marginTop: 14,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
                 <button
                   onClick={handleGenerate}
                   disabled={!canGenerate}
@@ -716,9 +602,7 @@ function TemplateCard({
 
     try {
       if (v.paused) await v.play();
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     setSoundOn((prev) => {
       const next = !prev;
@@ -755,14 +639,7 @@ function TemplateCard({
             />
 
             <div className="topPills" aria-hidden="true">
-              {selected ? (
-                <div className="selectedBadge" title="Template sélectionné">
-                  ✅ Sélectionné
-                </div>
-              ) : (
-                <span />
-              )}
-
+              {selected ? <div className="selectedBadge">✅ Sélectionné</div> : <span />}
               <div className="soundHint">🔊 {soundOn ? "Son ON" : "Son OFF"}</div>
             </div>
 
@@ -799,8 +676,7 @@ function TemplateCard({
           </div>
 
           <div className="tplMeta" style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
-            Catégorie :{" "}
-            <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
+            Catégorie : <strong>{(t.category ?? "").trim() ? t.category : "Autres"}</strong>
           </div>
         </div>
       </Card>

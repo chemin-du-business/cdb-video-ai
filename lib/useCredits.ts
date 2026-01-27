@@ -6,7 +6,8 @@ import { supabase } from "./supabaseClient";
 
 /**
  * ✅ Store global (singleton) pour partager credits/loading partout
- * => l'optimistic update devient instantané dans le layout + toutes les pages
+ * ✅ Realtime sur profiles => update UI "quasi instant" sans optimistic
+ * 🚫 Pas d'optimistic delta ici (évite le bug -2 en prod)
  */
 
 type CreditsState = {
@@ -131,12 +132,5 @@ export function useCredits() {
     await load();
   }, []);
 
-  const applyOptimisticDelta = useCallback((delta: number) => {
-    emit({
-      credits: Math.max(0, (state.credits ?? 0) + delta),
-      loading: false,
-    });
-  }, []);
-
-  return { credits, loading, refetch, applyOptimisticDelta };
+  return { credits, loading, refetch };
 }
