@@ -4,10 +4,6 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("❌ OPENAI_API_KEY manquante");
 }
@@ -18,17 +14,17 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
 }
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// ✅ DOIT matcher le size demandé à OpenAI
-const OUT_SIZE = "720x1280";
-const TARGET_WIDTH = 720;
-const TARGET_HEIGHT = 1280;
+const TARGET_WIDTH = 1024;
+const TARGET_HEIGHT = 1792;
 
 function isInsufficientCreditsError(message?: string) {
   const m = (message ?? "").toUpperCase();
@@ -67,12 +63,7 @@ export async function POST(req: Request) {
     /* ---------------- IMAGE NORMALIZATION ---------------- */
     const inputBuffer = Buffer.from(await image.arrayBuffer());
 
-    // ✅ IMPORTANT:
-    // - rotate() pour respecter l’orientation EXIF (iPhone)
-    // - contain + fond blanc (pas de crop)
-    // - taille EXACTE 720x1280 pour matcher OUT_SIZE
     const normalizedBuffer = await sharp(inputBuffer)
-      .rotate()
       .resize(TARGET_WIDTH, TARGET_HEIGHT, {
         fit: "contain",
         background: { r: 255, g: 255, b: 255 },
@@ -98,7 +89,7 @@ export async function POST(req: Request) {
         status: "queued",
         provider: "openai",
         progress: 0,
-        job_type: "image",
+        job_type: "generate",
         cost_credits: 1,
       })
       .select("id")
@@ -126,9 +117,9 @@ export async function POST(req: Request) {
       video = await openai.videos.create({
         model: "sora-2-pro",
         prompt,
-        input_reference: normalizedImage, // ✅ 720x1280
-        seconds: 12,
-        size: OUT_SIZE, // ✅ 720x1280
+        input_reference: normalizedImage,
+        seconds: "12",
+        size: "720x1280",
       });
     } catch (err: any) {
       console.error("❌ Sora create failed:", err);
@@ -143,7 +134,7 @@ export async function POST(req: Request) {
         .eq("id", job.id);
 
       return NextResponse.json(
-        { error: err?.message ?? "Failed to create video with provider" },
+        { error: "Failed to create video with provider" },
         { status: 500 }
       );
     }
