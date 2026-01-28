@@ -4,31 +4,39 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("❌ OPENAI_API_KEY manquante");
-}
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
-}
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
-}
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+if (!process.env.OPENAI_API_KEY) throw new Error("❌ OPENAI_API_KEY manquante");
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
+  throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL)
+  throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const TARGET_WIDTH = 1024;
-const TARGET_HEIGHT = 1792;
+// ✅ IMPORTANT : l'image doit matcher EXACTEMENT la size demandée à Sora
+const VIDEO_SIZE = "720x1280";
+const TARGET_WIDTH = 720;
+const TARGET_HEIGHT = 1280;
 
 function isInsufficientCreditsError(message?: string) {
   const m = (message ?? "").toUpperCase();
   return m.includes("INSUFFICIENT_CREDITS");
+}
+
+function safeErrorMessage(err: any) {
+  return (
+    err?.error?.message ||
+    err?.message ||
+    (typeof err === "string" ? err : "Unknown provider error")
+  );
 }
 
 export async function POST(req: Request) {
@@ -60,18 +68,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "image requise" }, { status: 400 });
     }
 
-    /* ---------------- IMAGE NORMALIZATION ---------------- */
+    /* ---------------- IMAGE NORMALIZATION ----------------
+       ✅ Sans rogner => fit: contain + fond blanc
+       ✅ Orientation OK => rotate() lit EXIF
+       ✅ Taille EXACTE 720x1280 (doit matcher size)
+    */
     const inputBuffer = Buffer.from(await image.arrayBuffer());
 
-    const normalizedBuffer = await sharp(inputBuffer)
-      .resize(TARGET_WIDTH, TARGET_HEIGHT, {
-        fit: "contain",
-        background: { r: 255, g: 255, b: 255 },
-      })
-      .jpeg({ quality: 92 })
-      .toBuffer();
+    let normalizedBuffer: Buffer;
+    try {
+      normalizedBuffer = await sharp(inputBuffer)
+        .rotate() // ✅ corrige les photos iPhone (EXIF)
+        .resize(TARGET_WIDTH, TARGET_HEIGHT, {
+          fit: "contain",
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
+        .jpeg({ quality: 92, mozjpeg: true })
+        .toBuffer();
+    } catch (e: any) {
+      console.error("❌ sharp normalize failed:", e);
+      return NextResponse.json({ error: "Image invalide ou illisible" }, { status: 400 });
+    }
 
-    // ✅ Fix TS/Vercel: Buffer -> Uint8Array pour BlobPart
+    // File (Node 18+) OK pour l'API OpenAI
     const normalizedImage = new File([new Uint8Array(normalizedBuffer)], "input.jpg", {
       type: "image/jpeg",
     });
@@ -119,22 +138,23 @@ export async function POST(req: Request) {
         prompt,
         input_reference: normalizedImage,
         seconds: "12",
-        size: "720x1280",
+        size: VIDEO_SIZE, // ✅ 720x1280
       });
     } catch (err: any) {
-      console.error("❌ Sora create failed:", err);
+      const msg = safeErrorMessage(err);
+      console.error("❌ Sora create failed:", msg, err);
 
       // ✅ failed => trigger DB refund
       await supabase
         .from("video_jobs")
         .update({
           status: "failed",
-          error_message: err?.message ?? "Sora create failed",
+          error_message: msg,
         })
         .eq("id", job.id);
 
       return NextResponse.json(
-        { error: "Failed to create video with provider" },
+        { error: "Failed to create video with provider", details: msg },
         { status: 500 }
       );
     }
@@ -145,7 +165,7 @@ export async function POST(req: Request) {
       .update({
         provider_video_id: video.id,
         status: "processing",
-        progress: (video as any).progress ?? 0,
+        progress: Number((video as any).progress ?? 0),
       })
       .eq("id", job.id);
 
@@ -169,7 +189,7 @@ export async function POST(req: Request) {
         id: job.id,
         status: "processing",
         provider_video_id: video.id,
-        progress: (video as any).progress ?? 0,
+        progress: Number((video as any).progress ?? 0),
       },
     });
   } catch (err: any) {
