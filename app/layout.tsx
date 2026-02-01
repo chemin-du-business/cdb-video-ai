@@ -65,6 +65,23 @@ export default function RootLayout({
       </Script>
       {/* TikTok Pixel Code End */}
 
+      {/* Snap Pixel Code Start */}
+      <Script id="snap-pixel" strategy="afterInteractive">
+        {`
+          (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
+          {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
+          a.queue=[];var s='script';r=t.createElement(s);r.async=!0;
+          r.src=n;var u=t.getElementsByTagName(s)[0];
+          u.parentNode.insertBefore(r,u);})(window,document,
+          'https://sc-static.net/scevent.min.js');
+
+          snaptr('init', 'eefe202a-cc83-482c-8931-a971030c6b7c', {});
+
+          snaptr('track', 'PAGE_VIEW');
+        `}
+      </Script>
+      {/* Snap Pixel Code End */}
+
       <body
         className={[
           geistSans.variable,
