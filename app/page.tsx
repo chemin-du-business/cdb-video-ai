@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type TemplatePreview = {
@@ -122,122 +122,6 @@ function PreviewCard({
   );
 }
 
-function EmotionsCarousel({
-  title = "Expressions & ton naturels",
-  badge = "Nouveau",
-  subtitle = "Tu peux varier l’intention, l’énergie et l’expression pour coller à ton script.",
-  bullets = ["Expressions crédibles", "Ton cohérent avec le script", "Idéal Ads & UGC (vertical 9:16)"],
-  images,
-  autoplayMs = 2600,
-}: {
-  title?: string;
-  badge?: string;
-  subtitle?: string;
-  bullets?: string[];
-  images: { src: string; alt?: string }[];
-  autoplayMs?: number;
-}) {
-  const items = useMemo(() => images ?? [], [images]);
-  const [idx, setIdx] = useState(0);
-
-  useEffect(() => {
-    if (items.length <= 1) return;
-    const t = window.setInterval(() => setIdx((v) => (v + 1) % items.length), autoplayMs);
-    return () => window.clearInterval(t);
-  }, [items.length, autoplayMs]);
-
-  const progressPct = items.length ? ((idx + 1) / items.length) * 100 : 0;
-
-  return (
-    <div className="rounded-3xl border border-black/10 bg-white/70 p-4 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.25)] backdrop-blur md:p-6">
-      <div className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-center">
-        <div>
-          <div className="flex items-center gap-3">
-            <h3 className="text-xl font-semibold tracking-tight text-black md:text-2xl">{title}</h3>
-            {badge ? (
-              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-[11px] font-medium text-black/60 backdrop-blur">
-                {badge}
-              </span>
-            ) : null}
-          </div>
-
-          <p className="mt-3 text-sm leading-6 text-black/60 md:text-base">{subtitle}</p>
-
-          <ul className="mt-5 space-y-2 text-sm text-black/60">
-            {bullets.map((b) => (
-              <li key={b} className="flex gap-2">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600/70" />
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative mx-auto w-full max-w-[320px] md:max-w-[360px]">
-          <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-black/10 bg-gradient-to-b from-black/[0.03] to-black/[0.01]">
-            {items.length > 1 ? (
-              <div className="absolute left-3 right-3 top-3 z-10">
-                <div className="h-1 w-full overflow-hidden rounded-full bg-white/70 backdrop-blur">
-                  <div className="h-full bg-black/60 transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
-                </div>
-              </div>
-            ) : null}
-
-            {items[idx]?.src ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="absolute inset-0 h-full w-full object-cover"
-                src={items[idx].src}
-                alt={items[idx].alt ?? `Emotion ${idx + 1}`}
-              />
-            ) : (
-              <div className="absolute inset-0 grid place-items-center">
-                <div className="text-xs font-medium text-black/55">Ajoute des images au carousel</div>
-              </div>
-            )}
-
-            {items.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setIdx((v) => (v - 1 + items.length) % items.length)}
-                  className="absolute inset-y-0 left-0 z-10 w-1/2 bg-transparent"
-                  aria-label="Image précédente"
-                  title="Précédent"
-                />
-                <button
-                  type="button"
-                  onClick={() => setIdx((v) => (v + 1) % items.length)}
-                  className="absolute inset-y-0 right-0 z-10 w-1/2 bg-transparent"
-                  aria-label="Image suivante"
-                  title="Suivant"
-                />
-              </>
-            ) : null}
-
-            {items.length > 1 ? (
-              <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-                {items.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setIdx(i)}
-                    className={["h-2 w-2 rounded-full border border-black/15", i === idx ? "bg-black/65" : "bg-white/70"].join(" ")}
-                    aria-label={`Aller à l’image ${i + 1}`}
-                    title={`Aller à l’image ${i + 1}`}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/0 via-white/0 to-white/20" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   const router = useRouter();
   const [checkingLogin, setCheckingLogin] = useState(false);
@@ -301,22 +185,6 @@ export default function Home() {
         }))
       : fallbackCards.map((c) => ({ ...c, format: "9:16", videoUrl: null as string | null }));
 
-  // ✅ CARROUSEL MIS À JOUR (3 IMAGES)
-  const emotionsImages = [
-    {
-      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image4%20copie.png",
-      alt: "Emotion 1",
-    },
-    {
-      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image5%20copie.png",
-      alt: "Emotion 2",
-    },
-    {
-      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image7%20copie.png",
-      alt: "Emotion 3",
-    },
-  ];
-
   const ctaImageUrl =
     "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image3.png";
 
@@ -337,12 +205,6 @@ export default function Home() {
           <div className="hidden items-center gap-6 text-sm text-black/60 md:flex">
             <a className="hover:text-black" href="#how">
               Comment ça marche
-            </a>
-            <a className="hover:text-black" href="#features">
-              Ce que tu peux faire
-            </a>
-            <a className="hover:text-black" href="#usecases">
-              Pour qui
             </a>
             <a className="hover:text-black" href="#faq">
               FAQ
@@ -371,7 +233,6 @@ export default function Home() {
               <div className="mb-5 flex flex-wrap gap-2">
                 <Pill>⚡ Script, Image ou Template</Pill>
                 <Pill>📱 Reels · Shorts · TikTok</Pill>
-                <Pill>🎯 Variantes A/B</Pill>
               </div>
 
               <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-black md:text-6xl">
@@ -531,118 +392,6 @@ export default function Home() {
                 </ul>
               </div>
             ))}
-          </div>
-        </section>
-
-        {/* FEATURES */}
-        <section id="features" className="mx-auto w-full max-w-6xl px-6 py-16">
-          <div className="flex items-end justify-between gap-6">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
-                Ce que tu peux faire (au-delà des templates)
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-                3 modes de création + variantes : tu produis vite, tu testes, tu gardes ce qui performe.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLoginClick}
-              disabled={checkingLogin}
-              className="hidden rounded-full border border-black/10 bg-black/[0.03] px-5 py-2 text-sm font-semibold text-black/80 hover:bg-black/[0.05] md:inline-flex disabled:opacity-60"
-            >
-              {checkingLogin ? "Redirection…" : "Accéder à l’app"}
-            </button>
-          </div>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {[
-              {
-                title: "Script → Vidéo",
-                desc: "Tu colles ton script, tu choisis l’intention, tu génères. Parfait pour vendre une offre ou un produit.",
-              },
-              {
-                title: "Image → Vidéo",
-                desc: "Tu pars d’une image (produit / visuel) et tu racontes une histoire autour. Idéal e-commerce.",
-              },
-              {
-                title: "Template → Remix",
-                desc: "Tu pars d’un style et tu le fais varier avec ton prompt (hook, CTA, rythme…).",
-              },
-              {
-                title: "Variantes A/B ultra rapides",
-                desc: "Teste plusieurs hooks + CTA pour identifier ce qui convertit. Tu dupliques en 1 clic.",
-              },
-              {
-                title: "Expressions & ton naturels",
-                desc: "Plus crédible, plus “humain”, plus engageant — sans tournage.",
-              },
-              {
-                title: "Export prêt à publier",
-                desc: "Format vertical 9:16. Téléchargement direct depuis la bibliothèque.",
-              },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="rounded-3xl border border-black/10 bg-white/70 p-6 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.25)] backdrop-blur"
-              >
-                <div className="text-sm font-semibold text-black">{f.title}</div>
-                <p className="mt-2 text-sm leading-6 text-black/60">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="relative mt-10 overflow-hidden rounded-[32px]">
-            <GlowBg />
-            <div className="relative">
-              <EmotionsCarousel images={emotionsImages} autoplayMs={3000} />
-            </div>
-          </div>
-        </section>
-
-        {/* USE CASES */}
-        <section id="usecases" className="mx-auto w-full max-w-6xl px-6 py-16">
-          <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-10">
-            <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">
-              Pour qui c’est fait
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
-              Si tu as besoin de produire des vidéos courtes (pubs ou contenu) de manière régulière, tu es au bon endroit.
-            </p>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              {[
-                {
-                  title: "E-commerce & DTC",
-                  bullets: ["Démo produit / bénéfices", "Angles “problème → solution”", "Offres, bundles, best-sellers"],
-                },
-                {
-                  title: "Agences",
-                  bullets: ["Production rapide pour clients", "Variantes pour tests A/B", "Organisation par campagnes"],
-                },
-                {
-                  title: "Coachs / infopreneurs",
-                  bullets: ["Vendre une offre", "Pitch + objections", "CTA clairs et courts"],
-                },
-                {
-                  title: "Services & local",
-                  bullets: ["Avant / après, résultats", "Preuve sociale", "Formats courts pour réseaux"],
-                },
-              ].map((c) => (
-                <div key={c.title} className="rounded-3xl border border-black/10 bg-white p-6">
-                  <div className="text-sm font-semibold text-black">{c.title}</div>
-                  <ul className="mt-3 space-y-2 text-sm text-black/60">
-                    {c.bullets.map((b) => (
-                      <li key={b} className="flex gap-2">
-                        <Check />
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
