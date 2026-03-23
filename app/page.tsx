@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type TemplatePreview = {
@@ -122,6 +122,121 @@ function PreviewCard({
   );
 }
 
+function EmotionsCarousel({
+  title = "Expressions & ton naturels",
+  badge = "Nouveau",
+  subtitle = "Tu peux varier l’intention, l’énergie et l’expression pour coller à ton script.",
+  bullets = ["Expressions crédibles", "Ton cohérent avec le script", "Idéal Ads & UGC (vertical 9:16)"],
+  images,
+  autoplayMs = 2600,
+}: {
+  title?: string;
+  badge?: string;
+  subtitle?: string;
+  bullets?: string[];
+  images: { src: string; alt?: string }[];
+  autoplayMs?: number;
+}) {
+  const items = useMemo(() => images ?? [], [images]);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const t = window.setInterval(() => setIdx((v) => (v + 1) % items.length), autoplayMs);
+    return () => window.clearInterval(t);
+  }, [items.length, autoplayMs]);
+
+  const progressPct = items.length ? ((idx + 1) / items.length) * 100 : 0;
+
+  return (
+    <div className="rounded-3xl border border-black/10 bg-white/70 p-4 shadow-[0_20px_60px_-40px_rgba(0,0,0,0.25)] backdrop-blur md:p-6">
+      <div className="grid gap-6 md:grid-cols-[1fr_0.9fr] md:items-center">
+        <div>
+          <div className="flex items-center gap-3">
+            <h3 className="text-xl font-semibold tracking-tight text-black md:text-2xl">{title}</h3>
+            {badge ? (
+              <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-[11px] font-medium text-black/60 backdrop-blur">
+                {badge}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-black/60 md:text-base">{subtitle}</p>
+
+          <ul className="mt-5 space-y-2 text-sm text-black/60">
+            {bullets.map((b) => (
+              <li key={b} className="flex gap-2">
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600/70" />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="relative mx-auto w-full max-w-[320px] md:max-w-[360px]">
+          <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl border border-black/10 bg-gradient-to-b from-black/[0.03] to-black/[0.01]">
+            {items.length > 1 ? (
+              <div className="absolute left-3 right-3 top-3 z-10">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-white/70 backdrop-blur">
+                  <div className="h-full bg-black/60 transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+                </div>
+              </div>
+            ) : null}
+
+            {items[idx]?.src ? (
+              <img
+                className="absolute inset-0 h-full w-full object-cover"
+                src={items[idx].src}
+                alt={items[idx].alt ?? `Emotion ${idx + 1}`}
+              />
+            ) : (
+              <div className="absolute inset-0 grid place-items-center">
+                <div className="text-xs font-medium text-black/55">Ajoute des images au carousel</div>
+              </div>
+            )}
+
+            {items.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIdx((v) => (v - 1 + items.length) % items.length)}
+                  className="absolute inset-y-0 left-0 z-10 w-1/2 bg-transparent"
+                  aria-label="Image précédente"
+                  title="Précédent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIdx((v) => (v + 1) % items.length)}
+                  className="absolute inset-y-0 right-0 z-10 w-1/2 bg-transparent"
+                  aria-label="Image suivante"
+                  title="Suivant"
+                />
+              </>
+            ) : null}
+
+            {items.length > 1 ? (
+              <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+                {items.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setIdx(i)}
+                    className={["h-2 w-2 rounded-full border border-black/15", i === idx ? "bg-black/65" : "bg-white/70"].join(" ")}
+                    aria-label={`Aller à l’image ${i + 1}`}
+                    title={`Aller à l’image ${i + 1}`}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/0 via-white/0 to-white/20" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [checkingLogin, setCheckingLogin] = useState(false);
@@ -185,6 +300,21 @@ export default function Home() {
         }))
       : fallbackCards.map((c) => ({ ...c, format: "9:16", videoUrl: null as string | null }));
 
+  const emotionsImages = [
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image4%20copie.png",
+      alt: "Emotion 1",
+    },
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image5%20copie.png",
+      alt: "Emotion 2",
+    },
+    {
+      src: "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image7%20copie.png",
+      alt: "Emotion 3",
+    },
+  ];
+
   const ctaImageUrl =
     "https://gnkfjfhlxkwvuxegdged.supabase.co/storage/v1/object/public/Image/image3.png";
 
@@ -192,7 +322,6 @@ export default function Home() {
     <div className="relative min-h-screen bg-white font-sans text-black">
       <GlowBg />
 
-      {/* NAV */}
       <header className="sticky top-0 z-50 border-b border-black/10 bg-white/70 backdrop-blur">
         <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
           <a href="#" className="flex items-center gap-3">
@@ -226,13 +355,13 @@ export default function Home() {
       </header>
 
       <main className="relative z-10">
-        {/* HERO */}
         <section className="mx-auto w-full max-w-6xl px-6 pt-10 pb-10 md:pt-16">
           <div className="grid items-center gap-10 md:grid-cols-[1.1fr_0.9fr]">
             <div>
               <div className="mb-5 flex flex-wrap gap-2">
                 <Pill>⚡ Script, Image ou Template</Pill>
                 <Pill>📱 Reels · Shorts · TikTok</Pill>
+                <Pill>🎯 Variantes A/B</Pill>
               </div>
 
               <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-black md:text-6xl">
@@ -318,7 +447,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SOCIAL PROOF (sobre + crédible) */}
         <section className="mx-auto w-full max-w-6xl px-6 pb-16">
           <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-8">
             <p className="text-xs font-medium tracking-wide text-black/50">
@@ -337,7 +465,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
         <section id="how" className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="flex items-end justify-between gap-6">
             <div>
@@ -395,7 +522,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FAQ */}
+        <section className="mx-auto w-full max-w-6xl px-6 py-16">
+          <div className="relative overflow-hidden rounded-[32px]">
+            <GlowBg />
+            <div className="relative">
+              <EmotionsCarousel images={emotionsImages} autoplayMs={3000} />
+            </div>
+          </div>
+        </section>
+
         <section id="faq" className="mx-auto w-full max-w-6xl px-6 py-16">
           <div className="rounded-3xl border border-black/10 bg-white/70 p-6 backdrop-blur md:p-10">
             <h2 className="text-2xl font-semibold tracking-tight text-black md:text-3xl">FAQ</h2>
@@ -432,7 +567,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FINAL CTA */}
         <section className="mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="relative overflow-hidden rounded-3xl border border-black/10 bg-gradient-to-r from-indigo-500/12 via-violet-500/10 to-fuchsia-500/12 p-8 md:p-10">
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-black/5 blur-3xl" />
@@ -458,7 +592,6 @@ export default function Home() {
               </div>
 
               <div className="relative md:justify-self-end">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={ctaImageUrl}
                   alt="Aperçu CDB Video IA"
@@ -482,7 +615,6 @@ export default function Home() {
           `}</style>
         </section>
 
-        {/* FOOTER */}
         <footer className="mx-auto w-full max-w-6xl px-6 pb-10 text-xs text-black/45">
           <div className="flex flex-col justify-between gap-4 border-t border-black/10 pt-6 sm:flex-row sm:items-center">
             <div>© {new Date().getFullYear()} CDB Video IA — Tous droits réservés</div>
