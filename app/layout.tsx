@@ -36,7 +36,6 @@ export const metadata: Metadata = {
   },
 };
 
-// ✅ IMPORTANT pour mobile (App Router)
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -46,26 +45,40 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="fr" className="h-full">
-      {/* TikTok Pixel Code Start */}
+      
+      {/* 🔥 FIRSTPROMOTER (AFFILIATION) */}
+      <Script id="firstpromoter-init" strategy="afterInteractive">
+        {`
+          (function(w){w.fpr=w.fpr||function(){w.fpr.q = w.fpr.q||[];w.fpr.q[arguments[0]=='set'?'unshift':'push'](arguments);};})(window);
+          fpr("init", {cid:"0k3q4xhq"});
+          fpr("click");
+        `}
+      </Script>
+
+      <Script
+        src="https://cdn.firstpromoter.com/fpr.js"
+        strategy="afterInteractive"
+      />
+
+      {/* TikTok Pixel */}
       <Script id="tiktok-pixel" strategy="afterInteractive">
         {`
           !function (w, d, t) {
             w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(
-          var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
-          ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+            var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script")
+            ;n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
             ttq.load('D5U7FL3C77UECCBSGHT0');
             ttq.page();
           }(window, document, 'ttq');
         `}
       </Script>
-      {/* TikTok Pixel Code End */}
 
-      {/* Snap Pixel Code Start */}
+      {/* Snap Pixel */}
       <Script id="snap-pixel" strategy="afterInteractive">
         {`
           (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
@@ -76,11 +89,9 @@ export default function RootLayout({
           'https://sc-static.net/scevent.min.js');
 
           snaptr('init', 'eefe202a-cc83-482c-8931-a971030c6b7c', {});
-
           snaptr('track', 'PAGE_VIEW');
         `}
       </Script>
-      {/* Snap Pixel Code End */}
 
       <body
         className={[
@@ -88,7 +99,7 @@ export default function RootLayout({
           geistMono.variable,
           "h-full min-h-screen antialiased",
           "bg-white text-black",
-          "overflow-x-hidden", // ✅ évite les débordements sur mobile
+          "overflow-x-hidden",
           "scroll-smooth",
         ].join(" ")}
       >
