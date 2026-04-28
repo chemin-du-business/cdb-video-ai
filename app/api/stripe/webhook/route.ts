@@ -5,9 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ✅ IMPORTANT: ne pas throw au top-level (sinon Vercel build casse)
-// ✅ IMPORTANT: ne pas instancier Stripe/Supabase au top-level si env manquantes
-
 export async function POST(req: Request) {
   console.log("🔔 Stripe webhook hit");
 
@@ -15,6 +12,7 @@ export async function POST(req: Request) {
   const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
   const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const FIRSTPROMOTER_API_KEY = process.env.FIRSTPROMOTER_API_KEY;
 
   if (!STRIPE_SECRET_KEY) {
     console.error("❌ STRIPE_SECRET_KEY manquante");
@@ -42,7 +40,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
   }
 
-  // ✅ raw body sinon signature cassée
   const rawBody = await req.text();
 
   let event: Stripe.Event;
@@ -58,7 +55,6 @@ export async function POST(req: Request) {
 
   console.log("✅ Event verified:", event.type, event.id);
 
-  // On ignore proprement les events qu'on ne traite pas
   if (event.type !== "checkout.session.completed") {
     return NextResponse.json({ received: true });
   }
@@ -66,7 +62,6 @@ export async function POST(req: Request) {
   const session = event.data.object as Stripe.Checkout.Session;
   console.log("🧾 checkout.session.completed payment_status:", session.payment_status);
 
-  // On crédite uniquement si payé
   if (session.payment_status !== "paid") {
     return NextResponse.json({ received: true, skipped: "not_paid" });
   }
@@ -84,7 +79,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid credits in metadata" }, { status: 400 });
   }
 
-  // ✅ idempotence (event déjà traité)
   const { data: existing } = await supabase
     .from("credit_ledger")
     .select("id")
@@ -96,11 +90,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true, skipped: "already_processed" });
   }
 
-  /**
-   * =====================================================
-   * ✅ Récupérer receipt_url + montant + ids Stripe
-   * =====================================================
-   */
   const stripeSessionId = session.id ?? null;
   const paymentIntentId =
     typeof session.payment_intent === "string" ? session.payment_intent : null;
@@ -108,7 +97,6 @@ export async function POST(req: Request) {
   let stripeChargeId: string | null = null;
   let receiptUrl: string | null = null;
 
-  // Montant / devise
   const amountTotal = typeof session.amount_total === "number" ? session.amount_total : null;
   const currency = session.currency ?? null;
 
@@ -130,17 +118,9 @@ export async function POST(req: Request) {
       }
     } catch (e: any) {
       console.warn("⚠️ Unable to retrieve charge/receipt:", e?.message || e);
-      // pas bloquant
     }
   }
 
-  /**
-   * =====================================================
-   * ✅ Créditer l’utilisateur + écrire dans le ledger
-   * =====================================================
-   */
-
-  // 1) Lire credits actuels
   const { data: profile, error: profErr } = await supabase
     .from("profiles")
     .select("credits")
@@ -155,7 +135,6 @@ export async function POST(req: Request) {
   const current = Number(profile?.credits ?? 0);
   const next = current + credits;
 
-  // 2) Update profile
   const { error: updErr } = await supabase
     .from("profiles")
     .update({ credits: next, plan: "credits" })
@@ -166,7 +145,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: updErr.message }, { status: 500 });
   }
 
-  // 3) Ledger row (avec reçu + montant + ids)
   const { error: ledErr } = await supabase.from("credit_ledger").insert({
     user_id: userId,
     delta: credits,
@@ -186,6 +164,63 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: ledErr.message }, { status: 500 });
   }
 
+  /**
+   * =====================================================
+   * ✅ FirstPromoter : tracker la vente affiliée
+   * =====================================================
+   * Important :
+   * - On le fait APRÈS le paiement Stripe confirmé.
+   * - On le fait APRÈS le crédit utilisateur réussi.
+   * - Si FirstPromoter échoue, on ne bloque pas le crédit.
+   * - event_id évite les doublons côté FirstPromoter.
+   */
+  const customerEmail =
+    session.customer_details?.email ||
+    session.customer_email ||
+    session.metadata?.user_email ||
+    null;
+
+  if (FIRSTPROMOTER_API_KEY && customerEmail && amountTotal) {
+    try {
+      const fpRes = await fetch("https://firstpromoter.com/api/v1/track/sale", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-KEY": FIRSTPROMOTER_API_KEY,
+        },
+        body: JSON.stringify({
+          email: customerEmail,
+          event_id: event.id,
+          amount: amountTotal,
+          currency: (currency ?? "eur").toUpperCase(),
+          ecom_sale: true,
+          skip_email_notification: true,
+          note: `Stripe Checkout ${session.metadata?.pack ?? "pack"} - ${stripeSessionId}`,
+        }),
+      });
+
+      if (!fpRes.ok && fpRes.status !== 409) {
+        const fpText = await fpRes.text();
+        console.warn("⚠️ FirstPromoter sale tracking failed:", fpRes.status, fpText);
+      } else {
+        console.log("✅ FirstPromoter sale tracked:", fpRes.status);
+      }
+    } catch (e: any) {
+      console.warn("⚠️ FirstPromoter sale tracking error:", e?.message || e);
+    }
+  } else {
+    console.warn("⚠️ FirstPromoter skipped: missing API key, email, or amount", {
+      hasApiKey: Boolean(FIRSTPROMOTER_API_KEY),
+      customerEmail,
+      amountTotal,
+    });
+  }
+
   console.log(`✅ Credits added: +${credits} (user: ${userId}) receipt:`, receiptUrl);
-  return NextResponse.json({ received: true, credited: credits, receipt_url: receiptUrl });
+
+  return NextResponse.json({
+    received: true,
+    credited: credits,
+    receipt_url: receiptUrl,
+  });
 }
