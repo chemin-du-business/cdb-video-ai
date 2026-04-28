@@ -7,13 +7,8 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
 
   const next = url.searchParams.get("next") || "/app";
-
-  // ✅ OAuth PKCE
   const code = url.searchParams.get("code");
 
-  // ✅ Email verify / recovery (multi-browser)
-  // Supabase utilise généralement token_hash, mais ton ancien code utilisait "token".
-  // On accepte les deux pour ne rien casser.
   const token_hash =
     url.searchParams.get("token_hash") ?? url.searchParams.get("token");
 
@@ -25,7 +20,7 @@ export async function GET(req: NextRequest) {
     | "email_change"
     | null;
 
-  const res = NextResponse.redirect(new URL(next, url.origin));
+  let res = NextResponse.redirect(new URL(next, url.origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +39,7 @@ export async function GET(req: NextRequest) {
     }
   );
 
-  // ✅ 1) Flow verify email / recovery (multi-browser)
+  // ✅ 1) Flow verify email / recovery : INCHANGÉ
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({
       type,
@@ -61,8 +56,13 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  // ✅ 2) Flow OAuth PKCE
+  // ✅ 2) Flow OAuth Google : on ajoute juste FirstPromoter après
   if (code) {
+    const fprUrl = new URL("/auth/fpr-callback", url.origin);
+    fprUrl.searchParams.set("next", next);
+
+    res = NextResponse.redirect(fprUrl);
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
@@ -75,7 +75,6 @@ export async function GET(req: NextRequest) {
     return res;
   }
 
-  // ❌ Rien à traiter (évite de renvoyer missing_code, car maintenant on accepte plusieurs flows)
   const fallback = new URL("/login", url.origin);
   fallback.searchParams.set("next", next);
   fallback.searchParams.set("error", "missing_params");
