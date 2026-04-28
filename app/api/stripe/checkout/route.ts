@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     if (!STRIPE_SECRET_KEY) throw new Error("❌ STRIPE_SECRET_KEY manquante");
     if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY manquante");
     if (!SUPABASE_URL) throw new Error("❌ NEXT_PUBLIC_SUPABASE_URL manquante");
-    if (!APP_URL) throw new Error("❌ NEXT_PUBLIC_APP_URL manquante (ex: https://cdbvideoia.com)");
+    if (!APP_URL) throw new Error("❌ NEXT_PUBLIC_APP_URL manquante");
 
     const stripe = new Stripe(STRIPE_SECRET_KEY);
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔐 Auth utilisateur via token Supabase (envoyé depuis le front)
+    // 🔐 Auth utilisateur
     const authHeader = req.headers.get("authorization");
     if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -52,10 +52,14 @@ export async function POST(req: Request) {
 
     const credits = PACKS[pack].credits;
 
-    // ✅ Checkout Session
+    // ✅ Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+
+      // 🔥 CRUCIAL POUR FIRSTPROMOTER
       client_reference_id: user.id,
+      customer_email: user.email ?? undefined,
+
       line_items: [
         {
           price: PACKS[pack].priceId,
@@ -63,15 +67,18 @@ export async function POST(req: Request) {
         },
       ],
 
-      // ✅ metadata sur session + payment intent (utile pour webhook)
+      // 🔥 METADATA (sécurité + debug + fallback)
       metadata: {
         user_id: user.id,
+        user_email: user.email ?? "",
         pack,
         credits: String(credits),
       },
+
       payment_intent_data: {
         metadata: {
           user_id: user.id,
+          user_email: user.email ?? "",
           pack,
           credits: String(credits),
         },
@@ -84,6 +91,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error("❌ /api/checkout error:", err);
-    return NextResponse.json({ error: err?.message ?? "Stripe error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Stripe error" },
+      { status: 500 }
+    );
   }
 }
